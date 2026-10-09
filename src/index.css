@@ -167,6 +167,19 @@ a {
   margin-bottom: 1rem;
 }
 
+.notice {
+  background: var(--accent-weak);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.notice p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
 .grid {
   display: grid;
   gap: 1rem;

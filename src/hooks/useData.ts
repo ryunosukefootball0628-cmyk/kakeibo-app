@@ -53,6 +53,10 @@ export function useTransactionsInMonth(yearMonth: string) {
   return useTransactionsBetween(start, end);
 }
 
+export function useTransactionCount() {
+  return useLiveQuery(() => db.transactions.count(), [], 0);
+}
+
 export function useLookup<T extends Category | PaymentMethod>(items: T[]) {
   return useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 }

@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
 import { exportBackup, importBackup, resetAll } from '../../db/operations';
 import { todayIso } from '../../utils/date';
+import { daysSince, getLastExportAt, recordExport } from '../../utils/localPrefs';
 
 export default function DataPage() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [lastExportAt, setLastExportAt] = useState(getLastExportAt);
 
   const handleExport = async () => {
     setError('');
@@ -19,6 +21,8 @@ export default function DataPage() {
     link.download = `kakeibo-backup-${todayIso()}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    recordExport();
+    setLastExportAt(getLastExportAt());
     setMessage(`${data.transactions.length}件の取引をエクスポートしました。`);
   };
 
@@ -79,7 +83,12 @@ export default function DataPage() {
 
       <div className="card">
         <h2>エクスポート</h2>
-        <p className="muted">全データを JSON ファイルとして保存します。</p>
+        <p className="muted">
+          全データを JSON ファイルとして保存します。
+          {lastExportAt
+            ? `最後のバックアップ: ${lastExportAt.slice(0, 10)}（${daysSince(lastExportAt)}日前）`
+            : 'まだ一度もバックアップを取っていません。'}
+        </p>
         <button className="primary" onClick={handleExport}>
           JSON をダウンロード
         </button>
