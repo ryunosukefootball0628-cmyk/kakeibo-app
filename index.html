@@ -4,7 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Content-Security-Policy は本番ビルド時に vite.config.ts から挿入される -->
-
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      display は browser のままにする。standalone にすると iOS ではホーム画面から
+      起動したアプリが Safari と別の保存領域になり、入力済みの家計データが見えなくなる。
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>家計簿</title>
   </head>
   <body>
