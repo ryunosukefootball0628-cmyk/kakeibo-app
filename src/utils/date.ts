@@ -61,11 +61,24 @@ export function yearMonthLabel(ym: string): string {
   return `${year}年${month}月`;
 }
 
-export function dateLabel(isoDate: string): string {
+/** 曜日 (0 = 日曜, 6 = 土曜) */
+export function weekdayOf(isoDate: string): number {
   const [y, m, d] = isoDate.split('-').map(Number);
-  const weekday = ['日', '月', '火', '水', '木', '金', '土'][
-    new Date(y, m - 1, d).getDay()
-  ];
+  return new Date(y, m - 1, d).getDay();
+}
+
+/** 月内の日付を 1 日から順に返す */
+export function datesOfMonth(ym: string): string[] {
+  const { year, month } = parseYearMonth(ym);
+  return Array.from(
+    { length: lastDayOfMonth(year, month) },
+    (_, i) => `${year}-${pad(month)}-${pad(i + 1)}`,
+  );
+}
+
+export function dateLabel(isoDate: string): string {
+  const [, m, d] = isoDate.split('-').map(Number);
+  const weekday = ['日', '月', '火', '水', '木', '金', '土'][weekdayOf(isoDate)];
   return `${m}/${d}(${weekday})`;
 }
 

@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardPage from './features/dashboard/DashboardPage';
 import RecurringPage from './features/recurring/RecurringPage';
+import CalendarReportPage from './features/reports/CalendarReportPage';
 import CategoryReportPage from './features/reports/CategoryReportPage';
 import PaymentMethodReportPage from './features/reports/PaymentMethodReportPage';
 import CategoriesPage from './features/settings/CategoriesPage';
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/transactions/new" element={<TransactionFormPage />} />
         <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
+        <Route path="/reports/calendar" element={<CalendarReportPage />} />
         <Route path="/reports/category" element={<CategoryReportPage />} />
         <Route
           path="/reports/payment-methods"

@@ -10,6 +10,8 @@
   --income: #2f6f4f;
   --expense: #b3433a;
   --danger: #b3261e;
+  --sunday: #c0392b;
+  --saturday: #2f62a8;
   color-scheme: light;
 }
 
@@ -26,6 +28,8 @@
     --income: #7dbd99;
     --expense: #e58d84;
     --danger: #e58d84;
+    --sunday: #ef9a92;
+    --saturday: #8fb3e8;
     color-scheme: dark;
   }
 }
@@ -390,4 +394,119 @@ td.memo {
 .chart-box {
   width: 100%;
   height: 260px;
+}
+
+/* ---------- カレンダー ---------- */
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding-bottom: 0.25rem;
+}
+
+.calendar-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.05rem;
+  min-height: 4.75rem;
+  padding: 0.3rem 0.4rem;
+  text-align: left;
+  border-radius: 7px;
+}
+
+.calendar-cell[aria-pressed='true'] {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+}
+
+.calendar-day {
+  align-self: flex-start;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  line-height: 1.5rem;
+  text-align: center;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: auto;
+}
+
+.calendar-weekday.sun,
+.calendar-day.sun {
+  color: var(--sunday);
+}
+
+.calendar-weekday.sat,
+.calendar-day.sat {
+  color: var(--saturday);
+}
+
+.calendar-cell.today .calendar-day {
+  background: var(--accent);
+  color: #fff;
+}
+
+.calendar-amount {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  /* 100 万円を超える日など、収まりきらない桁が隣のマスへはみ出さないようにする */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-amount .short {
+  display: none;
+}
+
+/* サイドバーの有無でマスの幅が変わるため、画面幅ではなくカードの幅で表記を切り替える */
+.calendar-card {
+  container-type: inline-size;
+}
+
+@media (max-width: 520px) {
+  .calendar-card {
+    padding: 0.75rem 0.5rem;
+  }
+}
+
+@container (max-width: 560px) {
+  .calendar {
+    gap: 2px;
+  }
+
+  .calendar-cell {
+    min-height: 3.75rem;
+    padding: 0.2rem;
+  }
+
+  .calendar-day {
+    min-width: 1.3rem;
+    height: 1.3rem;
+    line-height: 1.3rem;
+    font-size: 0.72rem;
+  }
+
+  .calendar-amount {
+    font-size: 0.62rem;
+  }
+
+  .calendar-amount .full {
+    display: none;
+  }
+
+  .calendar-amount .short {
+    display: inline;
+  }
 }

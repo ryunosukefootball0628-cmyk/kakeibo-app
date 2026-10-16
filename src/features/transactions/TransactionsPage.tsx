@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import MonthSelector from '../../components/MonthSelector';
-import { deleteTransaction } from '../../db/operations';
 import {
   useCategories,
   useLookup,
@@ -9,11 +8,11 @@ import {
   useTransactionsInMonth,
 } from '../../hooks/useData';
 import type { TransactionType } from '../../types';
-import { currentYearMonth, dateLabel } from '../../utils/date';
+import { currentYearMonth } from '../../utils/date';
 import { formatYen } from '../../utils/money';
+import TransactionTable from './TransactionTable';
 
 export default function TransactionsPage() {
-  const navigate = useNavigate();
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -43,11 +42,6 @@ export default function TransactionsPage() {
   const expense = filtered
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
-
-  const handleDelete = async (id: string, label: string) => {
-    if (!window.confirm(`「${label}」を削除しますか?`)) return;
-    await deleteTransaction(id);
-  };
 
   return (
     <>
@@ -139,66 +133,11 @@ export default function TransactionsPage() {
         {filtered.length === 0 ? (
           <p className="empty">該当する取引がありません。</p>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>日付</th>
-                  <th>カテゴリ</th>
-                  <th>支払い方法</th>
-                  <th>メモ</th>
-                  <th style={{ textAlign: 'right' }}>金額</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((t) => {
-                  const category = categoryById.get(t.categoryId);
-                  return (
-                    <tr key={t.id}>
-                      <td>{dateLabel(t.date)}</td>
-                      <td>
-                        <span
-                          className="swatch"
-                          style={{ background: category?.color ?? '#8a8a85' }}
-                        />
-                        {category?.name ?? '(削除済み)'}
-                      </td>
-                      <td>{methodById.get(t.paymentMethodId)?.name ?? '(削除済み)'}</td>
-                      <td className="memo">{t.memo}</td>
-                      <td
-                        className={`amount ${t.type === 'income' ? 'income' : 'expense'}`}
-                      >
-                        {t.type === 'income' ? '+' : '-'}
-                        {formatYen(t.amount)}
-                      </td>
-                      <td>
-                        <span className="row">
-                          <button
-                            className="small"
-                            onClick={() => navigate(`/transactions/${t.id}/edit`)}
-                          >
-                            編集
-                          </button>
-                          <button
-                            className="small danger"
-                            onClick={() =>
-                              handleDelete(
-                                t.id,
-                                `${t.date} ${category?.name ?? ''} ${formatYen(t.amount)}`,
-                              )
-                            }
-                          >
-                            削除
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TransactionTable
+            transactions={filtered}
+            categoryById={categoryById}
+            methodById={methodById}
+          />
         )}
       </div>
     </>

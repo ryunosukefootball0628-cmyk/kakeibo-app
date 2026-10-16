@@ -1,15 +1,24 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { db } from '../../db/db';
 import { addTransaction, updateTransaction } from '../../db/operations';
 import { useCategories, usePaymentMethods } from '../../hooks/useData';
 import type { TransactionType } from '../../types';
 import { todayIso } from '../../utils/date';
 
+/** 他の画面から登録・編集を開くときに navigate の state で渡せる値 */
+export interface TransactionFormState {
+  /** 新規登録時の日付の初期値 (YYYY-MM-DD) */
+  date?: string;
+  /** 保存後に戻る画面。未指定なら取引一覧 */
+  returnTo?: string;
+}
+
 export default function TransactionFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const formState = (useLocation().state ?? {}) as TransactionFormState;
   const categories = useCategories();
   const paymentMethods = usePaymentMethods();
 
@@ -19,7 +28,7 @@ export default function TransactionFormPage() {
   );
 
   const [type, setType] = useState<TransactionType>('expense');
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(formState.date ?? todayIso());
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState('');
@@ -82,7 +91,7 @@ export default function TransactionFormPage() {
     } else {
       await addTransaction(input);
     }
-    navigate('/transactions');
+    navigate(formState.returnTo ?? '/transactions');
   };
 
   return (

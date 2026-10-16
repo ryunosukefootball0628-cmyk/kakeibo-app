@@ -11,6 +11,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
   {
     label: '集計',
     items: [
+      { to: '/reports/calendar', label: 'カレンダー' },
       { to: '/reports/category', label: 'カテゴリ別' },
       { to: '/reports/payment-methods', label: '支払い方法別' },
     ],
