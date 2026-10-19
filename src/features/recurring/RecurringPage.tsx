@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import MonthSelector from '../../components/MonthSelector';
-import { db, newId } from '../../db/db';
-import { recordRecurring } from '../../db/operations';
+import {
+  deleteRecurring,
+  recordRecurring,
+  saveRecurring,
+  setRecurringActive,
+} from '../../db/operations';
+import { newId } from '../../db/seed';
 import {
   useCategories,
   useLookup,
@@ -84,7 +89,7 @@ export default function RecurringPage() {
     });
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!form) return;
 
@@ -118,17 +123,17 @@ export default function RecurringPage() {
       memo: form.memo.trim() || undefined,
     };
 
-    await db.recurringExpenses.put(record);
+    saveRecurring(record);
     setForm(null);
   };
 
-  const toggleActive = async (item: RecurringExpense) => {
-    await db.recurringExpenses.update(item.id, { isActive: !item.isActive });
+  const toggleActive = (item: RecurringExpense) => {
+    setRecurringActive(item.id, !item.isActive);
   };
 
-  const handleDelete = async (item: RecurringExpense) => {
+  const handleDelete = (item: RecurringExpense) => {
     if (!window.confirm(`「${item.name}」を削除しますか?`)) return;
-    await db.recurringExpenses.delete(item.id);
+    deleteRecurring(item.id);
   };
 
   return (

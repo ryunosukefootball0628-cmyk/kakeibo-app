@@ -1,9 +1,11 @@
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { db } from '../../db/db';
 import { addTransaction, updateTransaction } from '../../db/operations';
-import { useCategories, usePaymentMethods } from '../../hooks/useData';
+import {
+  useCategories,
+  usePaymentMethods,
+  useTransaction,
+} from '../../hooks/useData';
 import type { TransactionType } from '../../types';
 import { todayIso } from '../../utils/date';
 
@@ -22,10 +24,7 @@ export default function TransactionFormPage() {
   const categories = useCategories();
   const paymentMethods = usePaymentMethods();
 
-  const existing = useLiveQuery(
-    async () => (id ? await db.transactions.get(id) : undefined),
-    [id],
-  );
+  const existing = useTransaction(id);
 
   const [type, setType] = useState<TransactionType>('expense');
   const [date, setDate] = useState(formState.date ?? todayIso());
@@ -64,7 +63,7 @@ export default function TransactionFormPage() {
     }
   }, [paymentMethods, paymentMethodId]);
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -73,6 +72,11 @@ export default function TransactionFormPage() {
     }
     if (!categoryId || !paymentMethodId) {
       setError('カテゴリと支払い方法を選択してください。');
+      return;
+    }
+    // 読み込み前に保存すると、定期支出との紐づけ (recurringSourceId) が消えてしまう
+    if (id && !existing) {
+      setError('取引を読み込めていません。削除された可能性があります。');
       return;
     }
 
@@ -87,9 +91,9 @@ export default function TransactionFormPage() {
     };
 
     if (id) {
-      await updateTransaction(id, input);
+      updateTransaction(id, input);
     } else {
-      await addTransaction(input);
+      addTransaction(input);
     }
     navigate(formState.returnTo ?? '/transactions');
   };

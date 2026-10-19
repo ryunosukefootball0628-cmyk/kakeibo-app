@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { db, newId } from '../../db/db';
+import {
+  countTransactionsUsing,
+  deletePaymentMethod,
+  savePaymentMethod,
+} from '../../db/operations';
+import { newId } from '../../db/seed';
 import { usePaymentMethods } from '../../hooks/useData';
 import type { PaymentMethod, PaymentMethodKind } from '../../types';
 
@@ -55,7 +60,7 @@ export default function PaymentMethodsPage() {
     });
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!form) return;
     if (!form.name.trim()) {
@@ -75,7 +80,7 @@ export default function PaymentMethodsPage() {
     }
 
     const existing = paymentMethods.find((m) => m.id === form.id);
-    await db.paymentMethods.put({
+    savePaymentMethod({
       id: form.id ?? newId(),
       name: form.name.trim(),
       kind: form.kind,
@@ -90,16 +95,13 @@ export default function PaymentMethodsPage() {
   };
 
   const handleDelete = async (method: PaymentMethod) => {
-    const usedCount = await db.transactions
-      .where('paymentMethodId')
-      .equals(method.id)
-      .count();
+    const usedCount = await countTransactionsUsing('paymentMethodId', method.id);
     const message =
       usedCount > 0
         ? `「${method.name}」は${usedCount}件の取引で使われています。削除すると取引の支払い方法表示が「(削除済み)」になります。削除しますか?`
         : `「${method.name}」を削除しますか?`;
     if (!window.confirm(message)) return;
-    await db.paymentMethods.delete(method.id);
+    deletePaymentMethod(method.id);
   };
 
   return (

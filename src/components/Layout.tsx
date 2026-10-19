@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import SyncStatus from './SyncStatus';
 
 const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = [
   {
@@ -22,7 +23,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
       { to: '/recurring', label: '定期支出' },
       { to: '/settings/categories', label: 'カテゴリ設定' },
       { to: '/settings/payment-methods', label: '支払い方法設定' },
-      { to: '/settings/data', label: 'データ管理' },
+      { to: '/settings/data', label: 'アカウント・データ' },
     ],
   },
 ];
@@ -46,6 +47,7 @@ export default function Layout() {
         </nav>
       </aside>
       <main className="main">
+        <SyncStatus />
         <Outlet />
       </main>
     </div>

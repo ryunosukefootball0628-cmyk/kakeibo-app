@@ -1,0 +1,173 @@
+// firestore.rules のテスト。エミュレーター上で動かす: npm run test:rules
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+} from '@firebase/rules-unit-testing';
+import {
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  setLogLevel,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
+import { readFileSync } from 'node:fs';
+import { after, before, beforeEach, describe, test } from 'node:test';
+
+// 拒否されるはずの書き込みのたびに出る PERMISSION_DENIED の警告を抑える
+setLogLevel('silent');
+
+const env = await initializeTestEnvironment({
+  projectId: 'demo-kakeibo',
+  firestore: { rules: readFileSync('firestore.rules', 'utf8') },
+});
+
+const alice = () => env.authenticatedContext('alice').firestore();
+const bob = () => env.authenticatedContext('bob').firestore();
+const guest = () => env.unauthenticatedContext().firestore();
+
+const transaction = {
+  type: 'expense',
+  date: '2026-10-16',
+  amount: 1200,
+  categoryId: 'cat-food',
+  paymentMethodId: 'pm-cash',
+  memo: 'ランチ',
+  createdAt: '2026-10-16T03:00:00.000Z',
+  updatedAt: '2026-10-16T03:00:00.000Z',
+};
+
+const txRef = (db, uid = 'alice', id = 't1') => doc(db, 'users', uid, 'transactions', id);
+
+before(() => env.clearFirestore());
+beforeEach(() => env.clearFirestore());
+after(() => env.cleanup());
+
+describe('本人だけが読み書きできる', () => {
+  test('本人は取引を作成・読み取り・削除できる', async () => {
+    await assertSucceeds(setDoc(txRef(alice()), transaction));
+    await assertSucceeds(getDoc(txRef(alice())));
+    await assertSucceeds(
+      getDocs(query(collection(alice(), 'users', 'alice', 'transactions'), where('date', '>=', '2026-10-01'))),
+    );
+    await assertSucceeds(deleteDoc(txRef(alice())));
+  });
+
+  test('他人の取引は読めず、書き込めず、消せない', async () => {
+    await setDoc(txRef(alice()), transaction);
+    await assertFails(getDoc(txRef(bob(), 'alice')));
+    await assertFails(getDocs(collection(bob(), 'users', 'alice', 'transactions')));
+    await assertFails(setDoc(txRef(bob(), 'alice', 't2'), transaction));
+    await assertFails(deleteDoc(txRef(bob(), 'alice')));
+  });
+
+  test('ログインしていなければ何もできない', async () => {
+    await assertFails(getDoc(txRef(guest())));
+    await assertFails(setDoc(txRef(guest()), transaction));
+  });
+
+  test('プロフィールは本人だけが読み取り・削除できる', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'users', 'alice'), { createdAt: '2026-10-16T03:00:00.000Z' }));
+    await assertFails(getDoc(doc(bob(), 'users', 'alice')));
+    await assertFails(deleteDoc(doc(bob(), 'users', 'alice')));
+    await assertSucceeds(deleteDoc(doc(alice(), 'users', 'alice')));
+  });
+
+  test('決められた場所以外には書き込めない', async () => {
+    await assertFails(setDoc(doc(alice(), 'other', 'x'), { a: 1 }));
+    await assertFails(setDoc(doc(alice(), 'users', 'alice', 'unknown', 'x'), { a: 1 }));
+  });
+});
+
+describe('取引の形式', () => {
+  test('メモなし・定期支出からの記録は保存できる', async () => {
+    const { memo: _memo, ...withoutMemo } = transaction;
+    await assertSucceeds(setDoc(txRef(alice(), 'alice', 'a'), withoutMemo));
+    await assertSucceeds(
+      setDoc(txRef(alice(), 'alice', 'b'), { ...transaction, recurringSourceId: 'r1' }),
+    );
+  });
+
+  test('メモを消す更新ができる', async () => {
+    await setDoc(txRef(alice()), transaction);
+    await assertSucceeds(
+      updateDoc(txRef(alice()), { memo: deleteField(), amount: 1500, updatedAt: '2026-10-17T00:00:00.000Z' }),
+    );
+  });
+
+  for (const [label, data] of [
+    ['想定外の項目', { ...transaction, extra: true }],
+    ['必須項目の欠落', { ...transaction, amount: undefined }],
+    ['負の金額', { ...transaction, amount: -1 }],
+    ['小数の金額', { ...transaction, amount: 10.5 }],
+    ['文字列の金額', { ...transaction, amount: '1000' }],
+    ['不正な日付', { ...transaction, date: '2026/10/16' }],
+    ['不正な種別', { ...transaction, type: 'transfer' }],
+    ['長すぎるメモ', { ...transaction, memo: 'あ'.repeat(1001) }],
+  ]) {
+    test(`${label}は拒否される`, async () => {
+      const cleaned = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+      await assertFails(setDoc(txRef(alice()), cleaned));
+    });
+  }
+
+  test('長すぎる ID は拒否される', async () => {
+    await assertFails(setDoc(txRef(alice(), 'alice', 'x'.repeat(65)), transaction));
+  });
+});
+
+describe('マスタ・定期支出・プロフィールの形式', () => {
+  test('カテゴリ', async () => {
+    const ref = doc(alice(), 'users', 'alice', 'categories', 'cat-food');
+    const category = { name: '食費', type: 'expense', color: '#e8743b', sortOrder: 1 };
+    await assertSucceeds(setDoc(ref, category));
+    await assertFails(setDoc(ref, { ...category, name: '' }));
+    await assertFails(setDoc(ref, { ...category, type: 'other' }));
+  });
+
+  test('支払い方法 (現金とクレジットカード)', async () => {
+    const col = (id) => doc(alice(), 'users', 'alice', 'paymentMethods', id);
+    await assertSucceeds(setDoc(col('pm-cash'), { name: '現金', kind: 'cash', sortOrder: 1 }));
+    const card = {
+      name: 'カードA',
+      kind: 'credit_card',
+      closingDay: 15,
+      paymentDay: 27,
+      paymentMonthOffset: 1,
+      sortOrder: 3,
+    };
+    await assertSucceeds(setDoc(col('card'), card));
+    await assertFails(setDoc(col('card'), { ...card, closingDay: 32 }));
+    await assertFails(setDoc(col('card'), { ...card, kind: 'crypto' }));
+  });
+
+  test('定期支出 (毎月・毎年)', async () => {
+    const ref = doc(alice(), 'users', 'alice', 'recurringExpenses', 'r1');
+    const monthly = {
+      name: 'Netflix',
+      amount: 1490,
+      categoryId: 'cat-fun',
+      paymentMethodId: 'pm-bank',
+      cycle: 'monthly',
+      dayOfMonth: 31,
+      isActive: true,
+    };
+    await assertSucceeds(setDoc(ref, monthly));
+    await assertSucceeds(setDoc(ref, { ...monthly, cycle: 'yearly', monthOfYear: 4, memo: '年払い' }));
+    await assertSucceeds(updateDoc(ref, { isActive: false }));
+    await assertFails(setDoc(ref, { ...monthly, isActive: 'yes' }));
+    await assertFails(setDoc(ref, { ...monthly, monthOfYear: 13 }));
+  });
+
+  test('プロフィールは createdAt だけ', async () => {
+    const ref = doc(alice(), 'users', 'alice');
+    await assertSucceeds(setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z' }));
+    await assertFails(setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z', admin: true }));
+  });
+});

@@ -10,14 +10,13 @@ import {
 } from 'recharts';
 import { tooltipStyle } from '../../components/chartTheme';
 import MonthSelector from '../../components/MonthSelector';
-import StorageNotice from '../../components/StorageNotice';
+import LegacyDataNotice from '../../components/LegacyDataNotice';
 import { recordRecurring } from '../../db/operations';
 import {
   useCategories,
   useLookup,
   usePaymentMethods,
   useRecurrings,
-  useTransactionCount,
   useTransactionsBetween,
 } from '../../hooks/useData';
 import {
@@ -40,7 +39,6 @@ export default function DashboardPage() {
   const paymentMethods = usePaymentMethods();
   const recurrings = useRecurrings();
   const categoryById = useLookup(categories);
-  const transactionCount = useTransactionCount();
 
   // カードの請求対象期間は前月以前に遡るため、数ヶ月分まとめて取得する
   const wideRange = useMemo(
@@ -127,7 +125,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <StorageNotice transactionCount={transactionCount} />
+      <LegacyDataNotice />
 
       <MonthSelector value={yearMonth} onChange={setYearMonth} />
 

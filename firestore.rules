@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// 家計データは users/{uid} の下に置き、ログインした本人だけが読み書きできる。
+// 書き込みは画面が保存する形 (src/types/index.ts, src/db/collections.ts の FIELDS) と
+// 一致するものだけを許可し、想定外の項目や巨大な値で無料枠を使い切られないようにする。
+// ここに書かれていないパスはすべて拒否される。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isText(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function isOptionalText(data, key, max) {
+      return !(key in data) || (data[key] is string && data[key].size() <= max);
+    }
+
+    function isIntIn(value, min, max) {
+      return value is int && value >= min && value <= max;
+    }
+
+    function isOptionalIntIn(data, key, min, max) {
+      return !(key in data) || isIntIn(data[key], min, max);
+    }
+
+    function isId(id) {
+      return id.size() <= 64;
+    }
+
+    // 金額は円単位の整数 (上限 1 兆円)
+    function isAmount(value) {
+      return isIntIn(value, 0, 1000000000000);
+    }
+
+    function isProfile(data) {
+      return data.keys().hasOnly(['createdAt']) && isText(data.createdAt, 40);
+    }
+
+    function isTransaction(data) {
+      return data.keys().hasAll(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'createdAt', 'updatedAt'])
+        && data.type in ['income', 'expense']
+        && data.date is string && data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && isAmount(data.amount)
+        && isText(data.categoryId, 64)
+        && isText(data.paymentMethodId, 64)
+        && isOptionalText(data, 'memo', 1000)
+        && isOptionalText(data, 'recurringSourceId', 64)
+        && isText(data.createdAt, 40)
+        && isText(data.updatedAt, 40);
+    }
+
+    function isCategory(data) {
+      return data.keys().hasAll(['name', 'type', 'color', 'sortOrder'])
+        && data.keys().hasOnly(['name', 'type', 'color', 'sortOrder'])
+        && isText(data.name, 100)
+        && data.type in ['income', 'expense']
+        && isText(data.color, 32)
+        && data.sortOrder is number;
+    }
+
+    function isPaymentMethod(data) {
+      return data.keys().hasAll(['name', 'kind', 'sortOrder'])
+        && data.keys().hasOnly(['name', 'kind', 'closingDay', 'paymentDay', 'paymentMonthOffset', 'sortOrder'])
+        && isText(data.name, 100)
+        && data.kind in ['cash', 'bank', 'credit_card']
+        && isOptionalIntIn(data, 'closingDay', 1, 31)
+        && isOptionalIntIn(data, 'paymentDay', 1, 31)
+        && isOptionalIntIn(data, 'paymentMonthOffset', 0, 12)
+        && data.sortOrder is number;
+    }
+
+    function isRecurringExpense(data) {
+      return data.keys().hasAll(['name', 'amount', 'categoryId', 'paymentMethodId', 'cycle', 'dayOfMonth', 'isActive'])
+        && data.keys().hasOnly(['name', 'amount', 'categoryId', 'paymentMethodId', 'cycle', 'dayOfMonth', 'monthOfYear', 'isActive', 'memo'])
+        && isText(data.name, 100)
+        && isAmount(data.amount)
+        && isText(data.categoryId, 64)
+        && isText(data.paymentMethodId, 64)
+        && data.cycle in ['monthly', 'yearly']
+        && isIntIn(data.dayOfMonth, 1, 31)
+        && isOptionalIntIn(data, 'monthOfYear', 1, 12)
+        && data.isActive is bool
+        && isOptionalText(data, 'memo', 1000);
+    }
+
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isProfile(request.resource.data);
+
+      match /transactions/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isTransaction(request.resource.data);
+      }
+
+      match /categories/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isCategory(request.resource.data);
+      }
+
+      match /paymentMethods/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isPaymentMethod(request.resource.data);
+      }
+
+      match /recurringExpenses/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isRecurringExpense(request.resource.data);
+      }
+    }
+  }
+}

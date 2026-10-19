@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { db, newId } from '../../db/db';
+import {
+  countTransactionsUsing,
+  deleteCategory,
+  saveCategory,
+} from '../../db/operations';
+import { newId } from '../../db/seed';
 import { useCategories } from '../../hooks/useData';
 import type { Category, TransactionType } from '../../types';
 
@@ -27,14 +32,14 @@ export default function CategoriesPage() {
       color: category.color,
     });
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!form || !form.name.trim()) return;
 
     const existing = categories.find((c) => c.id === form.id);
     const sameType = categories.filter((c) => c.type === form.type);
 
-    await db.categories.put({
+    saveCategory({
       id: form.id ?? newId(),
       name: form.name.trim(),
       type: form.type,
@@ -47,16 +52,13 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (category: Category) => {
-    const usedCount = await db.transactions
-      .where('categoryId')
-      .equals(category.id)
-      .count();
+    const usedCount = await countTransactionsUsing('categoryId', category.id);
     const message =
       usedCount > 0
         ? `「${category.name}」は${usedCount}件の取引で使われています。削除すると取引のカテゴリ表示が「(削除済み)」になります。削除しますか?`
         : `「${category.name}」を削除しますか?`;
     if (!window.confirm(message)) return;
-    await db.categories.delete(category.id);
+    deleteCategory(category.id);
   };
 
   const renderGroup = (type: TransactionType, label: string) => {

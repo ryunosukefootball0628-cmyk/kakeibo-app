@@ -24,9 +24,9 @@ export default function TransactionTable({
 }: Props) {
   const navigate = useNavigate();
 
-  const handleDelete = async (id: string, label: string) => {
+  const handleDelete = (id: string, label: string) => {
     if (!window.confirm(`「${label}」を削除しますか?`)) return;
-    await deleteTransaction(id);
+    deleteTransaction(id);
   };
 
   return (

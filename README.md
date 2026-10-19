@@ -4,17 +4,21 @@
 
 **👉 [アプリを開く](https://ryunosukefootball0628-cmyk.github.io/kakeibo-app/)**
 
-インストールもアカウント登録も不要です。スマホのブラウザで開き、「ホーム画面に追加」しておくとアプリのように使えます。
+Google アカウントでログインするだけで使えます。記録はクラウドに保存され、同じアカウントでログインしたスマホと PC の間で自動的に同期されます。スマホのブラウザで開き、「ホーム画面に追加」しておくとアプリのように使えます。
 
-## データの保存場所（重要）
+## データの保存場所
 
-入力したデータは**お使いの端末のブラウザ内だけ**に保存されます。サーバーには一切送信されません。
+入力したデータは Google の Firebase（Cloud Firestore）に、ログインしたアカウントごとに分けて保存されます。
 
-このため、次の点にご注意ください。
+- **他の利用者からは見えません。** ログインした本人以外は読み書きできないよう、データベースのルール（[firestore.rules](firestore.rules)）で制限しています
+- **アプリの管理者は閲覧できる立場にあります。** 保存先のデータベースはこのアプリの管理者の Firebase プロジェクトです。気になる場合は、下の手順でご自身の Firebase プロジェクトを用意して動かすこともできます
+- **電波がなくても入力できます。** 端末内に一時保存され、つながったときに自動で送信されます
+- **ログアウトすると、端末内のコピーは削除されます。** クラウドの記録はそのまま残り、再ログインすると戻ります
+- 「アカウント・データ」画面から、JSON への書き出し・取り込み、アカウントと全データの削除ができます
 
-- **ブラウザのデータを消去すると復元できません。** 「データ管理」画面から定期的に JSON ファイルへ書き出してください
-- **端末をまたいだ共有はできません。** PC で入力したデータはスマホには表示されません（移したい場合は JSON のエクスポート／インポートを使います）
-- 他の人が同じ URL を開いても、その人自身のデータしか見えません
+### 以前のバージョンを使っていた方へ
+
+クラウド同期に対応する前は、記録をブラウザ内（IndexedDB）だけに保存していました。その記録が残っている端末でログインすると、ダッシュボードにクラウドへの取り込みを案内する表示が出ます。複数の端末で取り込んでも、同じ記録が重複することはありません。
 
 ## 主な機能
 
@@ -26,7 +30,8 @@
 | 支払い方法別集計 | 現金・口座・カードごとの内訳 |
 | カード請求額 | 締め日・支払日の設定から、対象期間と請求予定額を3ヶ月先まで算出 |
 | 定期支出・サブスク | 毎月／毎年の固定費を登録。発生月に確認して記録（二重登録を防ぐため自動登録はしません） |
-| データ管理 | JSON のエクスポート／インポート、初期化 |
+| 同期 | Google アカウントでログインし、端末間で記録を同期。オフラインでも入力可能 |
+| アカウント・データ | ログアウト、JSON のエクスポート／インポート、初期化、アカウントの削除 |
 
 カテゴリと支払い方法は自由に追加・編集できます。
 
@@ -36,23 +41,62 @@
 npm install
 ```
 
+### Firebase の準備
+
+自分の Firebase プロジェクトで動かす場合の手順です。無料の Spark プランで動きます。
+
+1. [Firebase コンソール](https://console.firebase.google.com/)でプロジェクトを作成する（Google アナリティクスは不要）
+2. **Authentication** → 「始める」→「ログイン方法」で **Google** を有効にする
+3. **Authentication** →「設定」→「承認済みドメイン」に公開先のドメイン（例: `<user>.github.io`）を追加する。`localhost` は最初から入っている
+4. **Firestore Database** →「データベースを作成」で、Standard エディション・本番環境モード・ロケーション `asia-northeast1`（東京）を選ぶ
+5. **Firestore Database** →「ルール」に [firestore.rules](firestore.rules) の内容を貼り付けて公開する
+6. 「プロジェクトの設定」→「マイアプリ」でウェブアプリ（`</>`）を追加し、表示される `firebaseConfig` の値を控える
+7. `.env.example` を `.env.local` という名前でコピーし、控えた値を書き込む
+
+`firebaseConfig` の値はブラウザに配信される公開値で、秘密情報ではありません（アクセスの制限はルールが担います）。それでも気になる場合は、Google Cloud コンソールで API キーに HTTP リファラーの制限（公開先のドメインと `localhost`）をかけておくと安心です。
+
 ```bash
 npm run dev
 ```
 
+### エミュレーターで試す
+
+Firebase のプロジェクトを作らなくても、ローカルのエミュレーターで動かせます。Java 11 以上が必要です。ログイン画面では、実在しない仮のアカウントを作って入れます。
+
 ```bash
-npm run build
+npm run emulators
 ```
 
-`main` ブランチに push すると GitHub Actions が自動でビルドし、GitHub Pages へ公開します。
+```bash
+npm run dev:emulator
+```
+
+### テスト
+
+データベースのルール（本人以外が読み書きできないこと、保存できる形式）を、エミュレーター上で検証します。
+
+```bash
+npm run test:rules
+```
+
+### 公開
+
+`main` ブランチに push すると GitHub Actions が自動でビルドし、GitHub Pages へ公開します。事前にリポジトリの Settings →「Secrets and variables」→「Actions」→「Variables」に、次の 4 つを登録してください（未登録だとビルドが失敗します）。
+
+| 名前 | 値 |
+|---|---|
+| `FIREBASE_API_KEY` | `firebaseConfig.apiKey` |
+| `FIREBASE_AUTH_DOMAIN` | `firebaseConfig.authDomain` |
+| `FIREBASE_PROJECT_ID` | `firebaseConfig.projectId` |
+| `FIREBASE_APP_ID` | `firebaseConfig.appId` |
 
 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 
 ## 技術構成
 
-React 18 / TypeScript / Vite / Dexie (IndexedDB) / Recharts / React Router
+React 18 / TypeScript / Vite / Firebase（Authentication・Cloud Firestore）/ Recharts / React Router
 
-バックエンドを持たない静的サイトです。外部への通信を行わないため、Content Security Policy で `connect-src 'none'` を指定して通信手段自体を塞いでいます。
+静的サイトとして GitHub Pages で配信し、データの保存とログインに Firebase を使います。Content Security Policy で通信先を Firebase の API だけに限定しており、依存パッケージに不正なコードが混入しても他の宛先へデータを送れないようにしています。
 
 ## ライセンス
 
