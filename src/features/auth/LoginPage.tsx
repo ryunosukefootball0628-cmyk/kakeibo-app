@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { signInWithGoogle, usesRedirect } from '../../auth/session';
+import { signInWithGoogle } from '../../auth/session';
 import {
   clearSyncError,
   describeError,
@@ -23,8 +23,9 @@ export default function LoginPage() {
     } catch (e) {
       if (!isCancelledPopup(e)) setError(describeError(e));
     } finally {
-      // リダイレクト方式ではこの時点で Google の画面へ移動している
-      if (!usesRedirect) setBusy(false);
+      // リダイレクト方式では成功すると Google の画面へ移動するのでここには来ない。
+      // 来るのは移動前に失敗したときなので、もう一度押せるよう戻す
+      setBusy(false);
     }
   };
 
