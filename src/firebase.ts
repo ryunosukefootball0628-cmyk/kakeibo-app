@@ -29,6 +29,7 @@ const useEmulators =
 const emulatorConfig = {
   apiKey: 'demo-api-key',
   // 本番 (Firebase Hosting) と同じく、ログインの中継ページがアプリと同じドメインにある扱いにする
+  // (リダイレクト方式になる)。実際に同じオリジンから配信するのは vite.config.ts の proxy
   authDomain: window.location.host,
   projectId: 'demo-kakeibo',
   appId: 'demo-app',
@@ -62,6 +63,7 @@ export const firestore = initializeFirestore(app, {
 });
 
 if (useEmulators) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  // 認証エミュレーターへは開発サーバーの中継 (vite.config.ts の proxy) を通してつなぐ
+  connectAuthEmulator(auth, window.location.origin, { disableWarnings: true });
   connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
 }

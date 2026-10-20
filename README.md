@@ -67,7 +67,7 @@ npm run dev
 
 ### エミュレーターで試す
 
-Firebase のプロジェクトを作らなくても、ローカルのエミュレーターで動かせます。Java 11 以上が必要です。ログイン画面では、実在しない仮のアカウントを作って入れます。
+Firebase のプロジェクトを作らなくても、ローカルのエミュレーターで動かせます。Java 11 以上が必要です。ログイン画面では、実在しない仮のアカウントを作って入れます（「Add new account」→「Auto-generate user information」→「Sign in with Google.com」）。この PC のブラウザで `http://localhost:5173` を開いてください（スマホからはデータベースのエミュレーターにつながりません）。
 
 ```bash
 npm run emulators

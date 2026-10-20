@@ -42,6 +42,19 @@ const contentSecurityPolicy = (authDomain: string | undefined): Plugin => ({
   ],
 });
 
+/**
+ * npm run dev:emulator のとき、認証エミュレーター (127.0.0.1:9099) への通信を開発サーバーが中継する。
+ * エミュレーターのログインの中継ページ (/emulator/auth/handler) は、リダイレクトの結果を自分の
+ * オリジンの sessionStorage に置き、アプリに埋め込んだ同じオリジンの iframe から読ませる。
+ * アプリと別オリジンのままだと、ブラウザのストレージ分離で iframe からは読めずログインが完了しない。
+ * 本番で中継ページを配信ドメインに置いているのと同じ理由 (src/auth/session.ts)。
+ */
+const authEmulatorProxy = Object.fromEntries(
+  ['/emulator', '/identitytoolkit.googleapis.com', '/securetoken.googleapis.com'].map(
+    (path) => [path, 'http://127.0.0.1:9099'],
+  ),
+);
+
 export default defineConfig(({ mode }) => {
   // .env.local と、Actions で渡す環境変数の両方から読む
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -52,6 +65,7 @@ export default defineConfig(({ mode }) => {
       // 同じ Wi-Fi のスマホから開けるよう、LAN のアドレスでも待ち受ける
       host: true,
       port: 5173,
+      proxy: env.VITE_FIREBASE_EMULATORS === 'true' ? authEmulatorProxy : undefined,
     },
   };
 });
