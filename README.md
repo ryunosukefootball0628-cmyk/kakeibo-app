@@ -2,7 +2,7 @@
 
 日々の収支を記録し、カテゴリ別・支払い方法別に集計するブラウザアプリです。クレジットカードは締め日・支払日から請求予定額を算出できます。
 
-**👉 [アプリを開く](https://kakeibo-app-ea14f.firebaseapp.com/)**
+**👉 [アプリを開く](https://kakeibo-pocket.web.app/)**
 
 Google アカウントでログインするだけで使えます。記録はクラウドに保存され、同じアカウントでログインしたスマホと PC の間で自動的に同期されます。スマホのブラウザで開き、「ホーム画面に追加」しておくとアプリのように使えます。
 
@@ -87,17 +87,23 @@ npm run test:rules
 
 ### 公開
 
-アプリは Firebase Hosting（`https://<project>.firebaseapp.com/`）で配信します。Google ログインの中継ページと同じドメインに置かないと、スマホでログインに失敗するためです。
+アプリは Firebase Hosting（`https://kakeibo-pocket.web.app/`）で配信します。Google ログインの中継ページと同じドメインに置かないと、スマホでログインに失敗するためです。以前のアドレス（`https://kakeibo-app-ea14f.firebaseapp.com/`）で開いた場合は、自動で今のアドレスへ移ります。
 
 `main` ブランチに push すると GitHub Actions が自動でビルドし、Firebase Hosting へ公開します。最初に一度だけ、次の準備が必要です。
 
-1. Firebase CLI にログインする
+1. 配信するサイトを作る。プロジェクト ID から決まる既定のアドレスは末尾にランダムな文字が付くことがあるため、名前を選べるサイトを追加する
+   1. Firebase コンソールの **Hosting** →「別のサイトを追加」で、好きなサイト名を入力する（`https://<サイト名>.web.app/` になる）
+   2. **Authentication** →「設定」→「承認済みドメイン」に `<サイト名>.web.app` を追加する
+   3. [Google Cloud コンソールの「認証情報」](https://console.cloud.google.com/apis/credentials)で「Web client (auto created by Google Service)」を開き、「承認済みのリダイレクト URI」に `https://<サイト名>.web.app/__/auth/handler` を追加して保存する
+   4. [firebase.json](firebase.json) の 1 つ目の `site` をサイト名に書き換える。2 つ目（`kakeibo-app-ea14f`）は以前のアドレスからの転送用なので、自分のプロジェクトで動かす場合は削除する
+
+2. Firebase CLI にログインする
 
    ```bash
    npx firebase-tools login
    ```
 
-2. GitHub Actions からデプロイするためのサービスアカウントを作り、リポジトリの Secrets に登録する。途中で GitHub へのログインを求められます。「build script を実行するか」「PR のマージで自動デプロイするか」はどちらも `N` で構いません（このリポジトリのワークフローを使うため）。最後に作られる `.github/workflows/firebase-hosting-*.yml` は削除してください
+3. GitHub Actions からデプロイするためのサービスアカウントを作り、リポジトリの Secrets に登録する。途中で GitHub へのログインを求められます。「build script を実行するか」「PR のマージで自動デプロイするか」はどちらも `N` で構いません（このリポジトリのワークフローを使うため）。最後に作られる `.github/workflows/firebase-hosting-*.yml` は削除してください
 
    ```bash
    npx firebase-tools init hosting:github
@@ -105,12 +111,12 @@ npm run test:rules
 
    登録される Secret の名前は `FIREBASE_SERVICE_ACCOUNT_<プロジェクト ID>` です。別のプロジェクトで動かす場合は `.github/workflows/deploy.yml` の Secret 名も合わせてください
 
-3. リポジトリの Settings →「Secrets and variables」→「Actions」→「Variables」に、次の 4 つを登録する（未登録だとビルドが失敗します）
+4. リポジトリの Settings →「Secrets and variables」→「Actions」→「Variables」に、次の 4 つを登録する（未登録だとビルドが失敗します）
 
 | 名前 | 値 |
 |---|---|
 | `FIREBASE_API_KEY` | `firebaseConfig.apiKey` |
-| `FIREBASE_AUTH_DOMAIN` | `firebaseConfig.authDomain` |
+| `FIREBASE_AUTH_DOMAIN` | 配信するサイトのドメイン（`<サイト名>.web.app`）。`firebaseConfig.authDomain` の値ではない |
 | `FIREBASE_PROJECT_ID` | `firebaseConfig.projectId` |
 | `FIREBASE_APP_ID` | `firebaseConfig.appId` |
 

@@ -10,7 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # アプリ本体は Firebase Hosting で配信する (ログインの中継ページと同じドメインにするため)
+  # アプリ本体は Firebase Hosting で配信する (ログインの中継ページと同じドメインにするため)。
+  # firebase.json に書いた全サイト (現在のアドレスと、転送用の以前のアドレス) へ同じものを公開する
   firebase-hosting:
     runs-on: ubuntu-latest
     permissions:

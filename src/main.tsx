@@ -5,14 +5,15 @@ import App from './App';
 import './index.css';
 
 /**
- * Firebase Hosting は <project>.web.app と <project>.firebaseapp.com の両方で配信される。
+ * Firebase Hosting は 1 つのサイトを <site>.web.app と <site>.firebaseapp.com の両方で配信する。
+ * さらに以前のアドレス (<project>.firebaseapp.com) のサイトにも同じアプリを置いている。
  * ログインの中継ページ (authDomain) と別のドメインで開くとスマホでログインに失敗するため、
  * authDomain 以外の Firebase Hosting のドメインで開かれたら authDomain へ移す。
  */
 function redirectToAuthDomain(): boolean {
   const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  if (!authDomain || location.host !== `${projectId}.web.app`) return false;
+  const onFirebaseHosting = /\.(web\.app|firebaseapp\.com)$/.test(location.host);
+  if (!authDomain || !onFirebaseHosting || location.host === authDomain) return false;
   location.replace(`https://${authDomain}/${location.hash}`);
   return true;
 }

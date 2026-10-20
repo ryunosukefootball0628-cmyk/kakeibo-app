@@ -252,13 +252,14 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 
 | 論点 | 対応 |
 |---|---|
-| 配信ドメイン | `https://<project>.firebaseapp.com/` を正とする（authDomain と同じ）。Firebase Hosting は `<project>.web.app` でも配信されるが、そちらで開くと中継ページが別ドメインになるため、起動時に firebaseapp.com へ移す（`src/main.tsx`） |
+| 配信ドメイン | `https://kakeibo-pocket.web.app/` を正とする（authDomain と同じ）。プロジェクト ID から決まる既定のアドレス（`kakeibo-app-ea14f.firebaseapp.com`）は末尾にランダムな文字が付いて偽サイトのように見えるため、名前を選べるサイトを追加して移した |
+| 別ドメインで開かれたとき | Firebase Hosting は 1 つのサイトを web.app と firebaseapp.com の両方で配信する。以前のアドレスのサイトにも同じアプリを公開しておき、authDomain 以外の Firebase Hosting のドメインで開かれたら起動時に authDomain へ移す（`src/main.tsx`）。中継ページが別ドメインになるとスマホでログインに失敗するため。以前のアドレスをサーバー側の転送（`firebase.json` の redirects）にしないのは、転送先の固定値とビルド時の authDomain がずれると転送がループするため |
 | ルーティング | GitHub Pages で配信していた頃からの `HashRouter` のままにし、URL は `#/transactions` 形式とする。移転案内ページは `#` 以降を引き継いで移動する |
 | 旧配信先 | GitHub Pages には移転案内（`moved/index.html`）を置く。移転先のデプロイが成功してから切り替える。移転先の URL はビルド時に Variables の authDomain から埋め込む |
 | キャッシュ | `/assets/` はファイル名にハッシュが付くので 1 年キャッシュし、`index.html` とマニフェストは毎回確認させる（`firebase.json` の headers） |
 | 公開範囲 | リポジトリは Public。公開されるのはソースコードのみで、家計簿のデータは Firestore にあるためリポジトリには含まれない |
 | Firebase の設定値 | `apiKey` などはブラウザに配信される公開値だが、フォークした人が自分のプロジェクトに差し替えやすいようリポジトリには含めない。開発時は `.env.local`、Actions ではリポジトリの Variables（`FIREBASE_API_KEY` など）から渡す。未登録ならビルドを失敗させる |
-| ログインできるドメイン | Firebase Authentication の「承認済みドメイン」に firebaseapp.com と localhost は最初から入っている。LAN のアドレス（スマホから `http://192.168.x.x:5173` で開く場合）は未登録のためログインできない |
+| ログインできるドメイン | Firebase Authentication の「承認済みドメイン」に `<project>.firebaseapp.com` と localhost は最初から入っている。追加したサイトのドメインは、承認済みドメインと Google Cloud の OAuth クライアントの「承認済みのリダイレクト URI」（`https://<サイト名>.web.app/__/auth/handler`）に手で追加する。LAN のアドレス（スマホから `http://192.168.x.x:5173` で開く場合）は未登録のためログインできない |
 | ルールの反映 | `firestore.rules` は自動では反映されない（GitHub Actions のサービスアカウントには Hosting の権限しか無い）。変更したら `firebase deploy --only firestore:rules` で反映する |
 
 ### アイコン
@@ -279,7 +280,7 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 通信先を Firebase に限定する CSP をビルド時に `index.html` へ挿入し、ブラウザ側で他の宛先への通信を塞ぐ。依存パッケージに将来悪意のあるコードが混入しても、家計データを第三者へ送信できない。
 
 - `connect-src`: Firestore（`firestore.googleapis.com`）と Authentication（`identitytoolkit.googleapis.com`, `securetoken.googleapis.com`）だけ
-- `script-src` の `https://apis.google.com` と `frame-src` の認証ドメイン（`<project>.firebaseapp.com`）: Google ログインの中継ページとのやり取りに Firebase が使う。認証ドメインはビルド時の設定値から埋め込む（本番では配信ドメインと同じ）
+- `script-src` の `https://apis.google.com` と `frame-src` の認証ドメイン（`kakeibo-pocket.web.app`）: Google ログインの中継ページとのやり取りに Firebase が使う。認証ドメインはビルド時の設定値から埋め込む（本番では配信ドメインと同じ）
 - `frame-ancestors 'self'` は meta タグでは指定できないため、Firebase Hosting のレスポンスヘッダーで指定する。`'none'` にしないのは、Firebase がログインの中継に同じドメインの `/__/auth/iframe` を埋め込むため
 - 保存先のデータベースはアプリの管理者の Firebase プロジェクトなので、管理者は技術的にはデータを閲覧できる。ログイン画面と README でこの点を明示する
 
