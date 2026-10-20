@@ -14,7 +14,7 @@ import {
   type WriteBatch,
 } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
-import { reauthenticate } from '../auth/session';
+import { isRecentlySignedIn } from '../auth/session';
 import { auth, firestore } from '../firebase';
 import type {
   BackupData,
@@ -284,15 +284,6 @@ export async function importBackup(json: string): Promise<void> {
   await replaceAll({ ...data, paymentMethods: migratePaymentMethods(data) });
 }
 
-/**
- * 端末内に残っていた旧データをクラウドへ取り込む。クラウドにある記録は消さず、
- * 同じ ID の記録だけ端末側の内容で上書きする (別の端末から取り込み済みでも重複しない)。
- */
-export async function mergeIntoCloud(data: BackupData): Promise<void> {
-  assertOnline();
-  await commitAll(upsertOps({ ...data, paymentMethods: migratePaymentMethods(data) }));
-}
-
 /** 全データを削除し、カテゴリと支払い方法を初期状態に戻す */
 export async function resetAll(): Promise<void> {
   assertOnline();
@@ -304,14 +295,18 @@ export async function resetAll(): Promise<void> {
   });
 }
 
-/** クラウド上の全データとアカウントを削除する */
+/**
+ * クラウド上の全データとアカウントを削除する。直前に本人確認 (reauthenticate) を済ませておくこと。
+ */
 export async function deleteAccount(): Promise<void> {
   assertOnline();
   const user = auth.currentUser;
   if (!user) throw new Error('ログインしていません。');
 
-  // 削除の直前に本人確認を済ませておく。データだけ消えてアカウントが残る事態を避けるため
-  await reauthenticate(user);
+  // アカウントの削除は直近のログインが必要。データだけ消えてアカウントが残らないよう、先に確かめる
+  if (!(await isRecentlySignedIn(user))) {
+    throw new Error('本人確認から時間が経ちました。もう一度「本人確認して削除」からやり直してください。');
+  }
 
   const current = await fetchEverything();
   await commitAll([

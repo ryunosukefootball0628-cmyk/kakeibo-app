@@ -28,7 +28,8 @@ const useEmulators =
 
 const emulatorConfig = {
   apiKey: 'demo-api-key',
-  authDomain: 'demo-kakeibo.firebaseapp.com',
+  // 本番 (Firebase Hosting) と同じく、ログインの中継ページがアプリと同じドメインにある扱いにする
+  authDomain: window.location.host,
   projectId: 'demo-kakeibo',
   appId: 'demo-app',
 };

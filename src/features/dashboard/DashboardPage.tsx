@@ -10,7 +10,6 @@ import {
 } from 'recharts';
 import { tooltipStyle } from '../../components/chartTheme';
 import MonthSelector from '../../components/MonthSelector';
-import LegacyDataNotice from '../../components/LegacyDataNotice';
 import { recordRecurring } from '../../db/operations';
 import {
   useCategories,
@@ -124,8 +123,6 @@ export default function DashboardPage() {
           <button className="primary">＋ 記録する</button>
         </Link>
       </div>
-
-      <LegacyDataNotice />
 
       <MonthSelector value={yearMonth} onChange={setYearMonth} />
 

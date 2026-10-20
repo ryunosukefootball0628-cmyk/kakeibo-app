@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- このページは通信しない。端末内に残った旧データを読んでファイルに保存するだけ -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
+    />
+    <title>家計簿は移転しました</title>
+    <style>
+      :root {
+        --bg: #f6f6f3;
+        --surface: #ffffff;
+        --border: #e2e1dc;
+        --text: #1d1d1b;
+        --muted: #6d6d66;
+        --accent: #2f6f4f;
+        --accent-weak: #e7f0ea;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a1a18;
+          --surface: #222220;
+          --border: #3a3a36;
+          --text: #ececea;
+          --muted: #a3a39c;
+          --accent: #7dbd99;
+          --accent-weak: #2c3c34;
+          color-scheme: dark;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN',
+          'Noto Sans JP', sans-serif;
+        font-size: 15px;
+        line-height: 1.7;
+      }
+      main {
+        width: 100%;
+        max-width: 440px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.75rem 1.5rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.75rem;
+      }
+      a {
+        color: var(--accent);
+        word-break: break-all;
+      }
+      .button {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 0.7rem 1rem;
+        margin: 1rem 0 0;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        font: inherit;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+      }
+      .button.secondary {
+        background: var(--surface);
+        color: var(--accent);
+      }
+      .legacy {
+        margin-top: 1.25rem;
+        padding: 1rem;
+        border-radius: 10px;
+        background: var(--accent-weak);
+        border: 1px solid var(--accent);
+      }
+      .legacy h2 {
+        font-size: 1rem;
+        margin: 0;
+      }
+      ol {
+        padding-left: 1.2rem;
+        margin: 0.5rem 0 0;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>家計簿は新しいアドレスに移転しました</h1>
+      <p>ログインを安定させるため、配信先を変更しました。今後は次のアドレスをお使いください。</p>
+      <p><a id="app-link" href="__APP_URL__">__APP_URL__</a></p>
+      <a id="open-button" class="button" href="__APP_URL__">新しいアドレスを開く</a>
+      <p id="redirecting" class="muted">移動しています…</p>
+
+      <section id="legacy" class="legacy" hidden>
+        <h2>この端末に以前の記録が残っています</h2>
+        <p id="legacy-summary"></p>
+        <ol>
+          <li>下のボタンで記録をファイルに保存する</li>
+          <li>新しいアドレスを開いて Google でログインする</li>
+          <li>「アカウント・データ」→「インポート」で、保存したファイルを選ぶ</li>
+        </ol>
+        <button id="download" class="button secondary" type="button">記録をファイルに保存</button>
+        <p class="muted">
+          インポートすると、そのアカウントのクラウド上の記録は置き換わります。新しいアドレスで記録を始める前に取り込んでください。
+        </p>
+      </section>
+    </main>
+
+    <script>
+      // 旧バージョン (端末内の IndexedDB に保存していた頃) のデータが残っていれば、
+      // 移動せずにファイルへの保存を案内する。残っていなければすぐに移動する。
+      const APP_URL = '__APP_URL__';
+      const target = APP_URL + location.hash;
+      document.getElementById('app-link').href = target;
+      document.getElementById('open-button').href = target;
+
+      const STORES = ['transactions', 'categories', 'paymentMethods', 'recurringExpenses'];
+
+      function readLegacy() {
+        return new Promise((resolve) => {
+          const request = indexedDB.open('kakeibo');
+          request.onerror = () => resolve(null);
+          request.onupgradeneeded = () => {
+            // 存在しなかった (いま空の DB が作られた)
+            request.transaction.abort();
+            resolve(null);
+          };
+          request.onsuccess = () => {
+            const db = request.result;
+            if (!STORES.every((name) => db.objectStoreNames.contains(name))) {
+              db.close();
+              resolve(null);
+              return;
+            }
+            const tx = db.transaction(STORES, 'readonly');
+            const data = {
+              // Dexie は内部のバージョン番号を 10 倍して保存する。
+              // DB version 1 (20 未満) は paymentMonthOffset が「翌月 = 0」基準の旧形式
+              version: db.version >= 20 ? 2 : 1,
+              exportedAt: new Date().toISOString(),
+            };
+            STORES.forEach((name) => {
+              tx.objectStore(name).getAll().onsuccess = (e) => {
+                data[name] = e.target.result;
+              };
+            });
+            tx.oncomplete = () => {
+              db.close();
+              resolve(data);
+            };
+            tx.onerror = () => {
+              db.close();
+              resolve(null);
+            };
+          };
+        });
+      }
+
+      function hasRecords(data) {
+        return data && (data.transactions.length > 0 || data.recurringExpenses.length > 0);
+      }
+
+      function download(data) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'kakeibo-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      readLegacy()
+        .catch(() => null)
+        .then((data) => {
+          if (!hasRecords(data)) {
+            location.replace(target);
+            return;
+          }
+          document.getElementById('redirecting').hidden = true;
+          document.getElementById('legacy').hidden = false;
+          document.getElementById('legacy-summary').textContent =
+            '取引 ' + data.transactions.length + ' 件・定期支出 ' +
+            data.recurringExpenses.length + ' 件が、このブラウザの中だけに保存されています。';
+          document.getElementById('download').addEventListener('click', () => download(data));
+        });
+    </script>
+  </body>
+</html>

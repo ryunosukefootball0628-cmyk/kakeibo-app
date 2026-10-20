@@ -1,18 +1,15 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// GitHub Pages は https://<user>.github.io/<repo>/ で配信されるため、
-// Actions 上ではリポジトリ名を base にする (ローカルでは "/" のまま)
-const repository = process.env.GITHUB_REPOSITORY?.split('/')[1];
-
 /**
  * 通信先を Firebase のデータ保存 (Firestore) とログイン (Authentication) に限定する。
  * 依存パッケージに混入したコードであっても、それ以外の宛先へ家計データを送信できなくなる。
  * - script-src の apis.google.com と frame-src の認証ドメインは、Google ログインの
- *   ポップアップとのやり取りに Firebase が使う
+ *   中継ページとのやり取りに Firebase が使う (本番では認証ドメイン = 配信ドメイン)
  * - style-src の 'unsafe-inline' は React / Recharts が style 属性を使うため外せない
  *
  * 開発時は Vite の HMR が WebSocket を張るので、本番ビルドにのみ適用する。
+ * meta タグでは指定できない frame-ancestors は firebase.json のヘッダーで指定している。
  */
 const csp = (authDomain: string | undefined) =>
   [
@@ -50,7 +47,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
 
   return {
-    base: repository ? `/${repository}/` : '/',
     plugins: [react(), contentSecurityPolicy(env.VITE_FIREBASE_AUTH_DOMAIN)],
     server: {
       // 同じ Wi-Fi のスマホから開けるよう、LAN のアドレスでも待ち受ける

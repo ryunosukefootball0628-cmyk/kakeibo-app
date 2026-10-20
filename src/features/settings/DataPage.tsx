@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   clearCacheAndReload,
   hasPendingWrites,
+  isRecentlySignedIn,
+  reauthenticate,
   signOutAndClearCache,
+  usesRedirect,
   useUser,
 } from '../../auth/session';
-import LegacyDataNotice from '../../components/LegacyDataNotice';
 import {
   deleteAccount,
   exportBackup,
@@ -15,13 +17,47 @@ import {
 import { describeError, isCancelledPopup } from '../../db/syncStatus';
 import { downloadJson } from '../../utils/download';
 
+/**
+ * リダイレクト方式の本人確認では画面が読み込み直されるため、
+ * 「削除のための本人確認から戻ってきた」ことを sessionStorage に残しておく。
+ */
+const REAUTH_FOR_DELETE = 'kakeibo.reauthForDelete';
+
+function markReauthForDelete() {
+  try {
+    sessionStorage.setItem(REAUTH_FOR_DELETE, '1');
+  } catch {
+    // 保存できなくても、戻ってきたあと「本人確認して削除」をもう一度押せば進められる
+  }
+}
+
+function consumeReauthForDelete(): boolean {
+  try {
+    const marked = sessionStorage.getItem(REAUTH_FOR_DELETE) === '1';
+    sessionStorage.removeItem(REAUTH_FOR_DELETE);
+    return marked;
+  } catch {
+    return false;
+  }
+}
+
+type DeleteStep = 'idle' | 'confirm' | 'verified';
+
 export default function DataPage() {
   const user = useUser();
   const fileInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<DeleteStep>('idle');
+
+  // 本人確認から戻ってきたら、そのまま最後の確認を表示する
+  useEffect(() => {
+    if (!consumeReauthForDelete()) return;
+    isRecentlySignedIn(user).then((recent) => {
+      if (recent) setDeleteStep('verified');
+    });
+  }, [user]);
 
   /** まとめて読み書きする操作は数秒かかるため、その間は他のボタンを押せないようにする */
   const run = async (task: () => Promise<string | void>) => {
@@ -93,17 +129,27 @@ export default function DataPage() {
 
   // 本人確認のポップアップはクリック直後に開かないとブロックされるため、
   // window.confirm を挟まず、画面上で確認してから押してもらう
+  const handleVerify = () =>
+    run(async () => {
+      if (usesRedirect) markReauthForDelete();
+      await reauthenticate(user);
+      setDeleteStep('verified');
+    });
+
   const handleDeleteAccount = () =>
     run(async () => {
-      await deleteAccount();
+      try {
+        await deleteAccount();
+      } catch (e) {
+        setDeleteStep('confirm');
+        throw e;
+      }
       await clearCacheAndReload();
     });
 
   return (
     <>
       <h1>アカウント・データ</h1>
-
-      <LegacyDataNotice />
 
       {message && (
         <div className="card">
@@ -171,30 +217,38 @@ export default function DataPage() {
         <h2>アカウントの削除</h2>
         <p className="muted">
           クラウド上のすべての記録とアカウントを削除します。確認のため、もう一度 Google
-          アカウントの選択画面が開きます。
+          アカウントを選んで本人確認をしてもらいます。
         </p>
-        {confirmingDelete ? (
-          <>
-            <p className="expense">
-              すべての端末から記録が見られなくなり、元に戻せません。必要なら先にエクスポートしてください。
-            </p>
-            <div className="row">
-              <button className="danger" onClick={handleDeleteAccount} disabled={busy}>
-                削除する
-              </button>
-              <button onClick={() => setConfirmingDelete(false)} disabled={busy}>
-                キャンセル
-              </button>
-            </div>
-          </>
-        ) : (
+        {deleteStep === 'idle' && (
           <button
             className="danger"
-            onClick={() => setConfirmingDelete(true)}
+            onClick={() => setDeleteStep('confirm')}
             disabled={busy}
           >
             アカウントを削除
           </button>
+        )}
+        {deleteStep !== 'idle' && (
+          <>
+            <p className="expense">
+              {deleteStep === 'verified' && '本人確認ができました。'}
+              すべての端末から記録が見られなくなり、元に戻せません。必要なら先にエクスポートしてください。
+            </p>
+            <div className="row">
+              {deleteStep === 'confirm' ? (
+                <button className="danger" onClick={handleVerify} disabled={busy}>
+                  本人確認して削除
+                </button>
+              ) : (
+                <button className="danger" onClick={handleDeleteAccount} disabled={busy}>
+                  削除する
+                </button>
+              )}
+              <button onClick={() => setDeleteStep('idle')} disabled={busy}>
+                キャンセル
+              </button>
+            </div>
+          </>
         )}
       </div>
     </>

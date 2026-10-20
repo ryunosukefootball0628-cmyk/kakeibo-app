@@ -1,23 +1,34 @@
 import { useState } from 'react';
-import { signInWithGoogle } from '../../auth/session';
-import { describeError, isCancelledPopup } from '../../db/syncStatus';
+import { signInWithGoogle, usesRedirect } from '../../auth/session';
+import {
+  clearSyncError,
+  describeError,
+  isCancelledPopup,
+  useSyncError,
+} from '../../db/syncStatus';
 
 export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Google の画面から戻ってきたときの失敗 (リダイレクト方式) はこちらに届く
+  const redirectError = useSyncError();
 
   // ポップアップがブロックされないよう、クリックから直接ログインを始める
   const handleSignIn = async () => {
     setBusy(true);
     setError('');
+    clearSyncError();
     try {
       await signInWithGoogle();
     } catch (e) {
       if (!isCancelledPopup(e)) setError(describeError(e));
     } finally {
-      setBusy(false);
+      // リダイレクト方式ではこの時点で Google の画面へ移動している
+      if (!usesRedirect) setBusy(false);
     }
   };
+
+  const shownError = error || redirectError;
 
   return (
     <div className="login">
@@ -37,7 +48,7 @@ export default function LoginPage() {
         <button className="primary login-button" onClick={handleSignIn} disabled={busy}>
           {busy ? 'ログイン中…' : 'Google でログイン'}
         </button>
-        {error && <p className="expense">{error}</p>}
+        {shownError && <p className="expense">{shownError}</p>}
 
         <ul className="login-notes muted">
           <li>
@@ -46,6 +57,9 @@ export default function LoginPage() {
           <li>電波のない場所でも入力でき、つながったときに自動で送信されます。</li>
           <li>
             他の利用者があなたの記録を見ることはできません。なお、保存先のデータベースはこのアプリの管理者が管理しており、管理者は技術的には保存された記録を閲覧できる立場にあります。
+          </li>
+          <li>
+            LINE などのアプリ内で開いた画面では Google のログインが使えません。Safari や Chrome で開いてください。
           </li>
         </ul>
       </div>

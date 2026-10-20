@@ -65,12 +65,14 @@
 
 ### 3.6 アカウント・同期（優先度高）
 - Google アカウントでログインする。未ログインではログイン画面だけを表示する
+- ログインは同じタブで Google の画面へ移るリダイレクト方式にする。スマホではポップアップが別タブで開かれ、ログイン途中の情報が失われて失敗することがあるため（iPhone の Chrome で「missing initial state」を確認）。リダイレクト方式は中継ページ（`/__/auth/handler`）がアプリと同じドメインにないと動かないため、アプリを Firebase Hosting で配信する（8 章）。中継ページが別ドメインになる localhost での開発時だけポップアップ方式にする
+- リダイレクトから戻ったときのエラーは `getRedirectResult` でしか受け取れないため、起動時に必ず呼んで画面に表示する
 - 初回ログイン時に初期カテゴリ・支払い方法を作成する。2台で同時に初回ログインしても二重に作らないよう、トランザクションでプロフィールの有無を確かめてから作る
 - 記録は同じアカウントでログインした端末間で同期する。他の端末での変更もリアルタイムに反映する
 - オフラインでも閲覧・入力でき、接続が戻ると自動で送信する。画面操作からの書き込みはサーバーの応答を待たずに画面へ反映し、失敗はあとから画面上部に表示する
 - ログアウト時は端末内のキャッシュも削除する（共用 PC で次の人に家計データを残さないため）。未送信の変更があれば警告する
-- アカウント削除: 本人確認（Google の再ログイン）のあと、クラウド上の全データとアカウントを削除する
-- 旧バージョンで端末内（IndexedDB）だけに保存していた記録が残っていれば、ダッシュボードとアカウント・データ画面でクラウドへの取り込みを案内する。取り込みは ID 単位の上書きで、複数端末から取り込んでも重複しない。サーバーへの書き込みが確定してから端末側を削除する
+- アカウント削除: 本人確認（Google の再ログイン）のあと、クラウド上の全データとアカウントを削除する。Firebase は削除に直近 5 分以内のログインを求めるため、データを消し始める前に ID トークンの `auth_time` で確かめる（データだけ消えてアカウントが残る事態を避ける）。リダイレクト方式の本人確認では画面が読み込み直されるので、戻ってきたことを sessionStorage の目印で判定し、最後の確認を表示する
+- 旧バージョンで端末内（IndexedDB）だけに保存していた記録は、旧配信先（github.io）のオリジンにあり、新しい配信先からは読めない。旧配信先に置いた移転案内ページ（`moved/index.html`）が端末内の記録を見つけたら、移動せずに JSON での保存を案内し、新しい配信先でインポートしてもらう
 
 ### 3.7 予算管理（任意・将来拡張）
 - 今回のスコープ外。カテゴリ別の月間予算設定・超過警告は将来拡張として設計上の余地だけ残す（データモデルに budget テーブルを追加しやすい形にする）。
@@ -147,7 +149,7 @@ users/{uid}/recurringExpenses/{id}   RecurringExpense
 
 ### スキーマのバージョン管理
 
-クラウド移行前は端末内の IndexedDB（Dexie）に保存しており、そのスキーマを `version()` で管理していた。旧データの取り込みのために `src/db/legacyDb.ts` に残している。
+クラウド移行前は端末内の IndexedDB（Dexie）に保存しており、そのスキーマを `version()` で管理していた。移転案内ページは Dexie を使わずに読むため、IndexedDB のバージョン（Dexie の値の 10 倍）から JSON の `version` を決める。
 
 | DB version | 内容 |
 |---|---|
@@ -197,8 +199,7 @@ kakeibo-app/
 │   │   ├─ collections.ts # Firestore の配置と保存する項目
 │   │   ├─ operations.ts  # 登録/更新/削除、初回の初期データ、バックアップ入出力、アカウント削除
 │   │   ├─ seed.ts        # 初期カテゴリ・支払い方法
-│   │   ├─ syncStatus.ts  # 書き込み失敗とオフライン状態の通知
-│   │   └─ legacyDb.ts    # 旧バージョンの端末内データ (取り込み用)
+│   │   └─ syncStatus.ts  # 書き込み失敗とオフライン状態の通知
 │   ├─ features/
 │   │   ├─ auth/        # ログイン画面、設定不足の案内
 │   │   ├─ dashboard/
@@ -210,10 +211,13 @@ kakeibo-app/
 │   ├─ hooks/           # onSnapshot によるデータの購読
 │   ├─ utils/           # date / money / billing / recurring
 │   └─ types/
+├─ moved/
+│   └─ index.html       # 旧配信先 (GitHub Pages) に置く移転案内
 ├─ tests/
 │   └─ firestore.rules.test.mjs
 ├─ firestore.rules
-├─ firebase.json        # ルールの配置とエミュレーターの設定
+├─ firebase.json        # ルール・Hosting (ヘッダー)・エミュレーターの設定
+├─ .firebaserc          # デプロイ先のプロジェクト
 ├─ index.html
 ├─ package.json
 ├─ tsconfig.json
@@ -242,16 +246,20 @@ npm run build          # 型チェック + 本番ビルド
 
 ## 8. デプロイ
 
-GitHub Pages で静的ホスティングする。`main` への push をトリガーに GitHub Actions（`.github/workflows/deploy.yml`）がビルドし、`dist` をそのまま配信する。
+Firebase Hosting で静的ホスティングする。`main` への push をトリガーに GitHub Actions（`.github/workflows/deploy.yml`）がビルドし、`dist` を Firebase Hosting へデプロイする。デプロイには `firebase init hosting:github` で作ったサービスアカウント（Secrets）を使う。
+
+当初は GitHub Pages で配信していたが、アプリ（github.io）とログインの中継ページ（firebaseapp.com）が別ドメインになり、iPhone でログインに失敗したため移した。Firebase Hosting は `/__/auth/handler` を自動で配信するので、アプリと中継ページが同じドメインになる。
 
 | 論点 | 対応 |
 |---|---|
-| 配信パス | Pages は `https://<user>.github.io/<repo>/` で配信されるため、Actions 上では環境変数 `GITHUB_REPOSITORY` からリポジトリ名を取り出して Vite の `base` に設定する。ローカル開発では `/` のまま |
-| ルーティング | Pages はサーバー側のリライトに対応しておらず、`/transactions` を直接開くと 404 になる。このため `HashRouter` を採用し、URL は `#/transactions` 形式とする |
-| 公開範囲 | 無料プランで Pages を使うためリポジトリは Public。公開されるのはソースコードのみで、家計簿のデータは Firestore にあるためリポジトリには含まれない |
+| 配信ドメイン | `https://<project>.firebaseapp.com/` を正とする（authDomain と同じ）。Firebase Hosting は `<project>.web.app` でも配信されるが、そちらで開くと中継ページが別ドメインになるため、起動時に firebaseapp.com へ移す（`src/main.tsx`） |
+| ルーティング | GitHub Pages で配信していた頃からの `HashRouter` のままにし、URL は `#/transactions` 形式とする。移転案内ページは `#` 以降を引き継いで移動する |
+| 旧配信先 | GitHub Pages には移転案内（`moved/index.html`）を置く。移転先のデプロイが成功してから切り替える。移転先の URL はビルド時に Variables の authDomain から埋め込む |
+| キャッシュ | `/assets/` はファイル名にハッシュが付くので 1 年キャッシュし、`index.html` とマニフェストは毎回確認させる（`firebase.json` の headers） |
+| 公開範囲 | リポジトリは Public。公開されるのはソースコードのみで、家計簿のデータは Firestore にあるためリポジトリには含まれない |
 | Firebase の設定値 | `apiKey` などはブラウザに配信される公開値だが、フォークした人が自分のプロジェクトに差し替えやすいようリポジトリには含めない。開発時は `.env.local`、Actions ではリポジトリの Variables（`FIREBASE_API_KEY` など）から渡す。未登録ならビルドを失敗させる |
-| ログインできるドメイン | Firebase Authentication の「承認済みドメイン」に Pages のドメインを登録する。LAN のアドレス（スマホから `http://192.168.x.x:5173` で開く場合）は未登録のためログインできない |
-| ルールの反映 | `firestore.rules` は自動では反映されない。変更したら Firebase コンソールに貼り付けるか、`firebase deploy --only firestore:rules` で反映する |
+| ログインできるドメイン | Firebase Authentication の「承認済みドメイン」に firebaseapp.com と localhost は最初から入っている。LAN のアドレス（スマホから `http://192.168.x.x:5173` で開く場合）は未登録のためログインできない |
+| ルールの反映 | `firestore.rules` は自動では反映されない（GitHub Actions のサービスアカウントには Hosting の権限しか無い）。変更したら `firebase deploy --only firestore:rules` で反映する |
 
 ### アイコン
 
@@ -271,13 +279,13 @@ GitHub Pages で静的ホスティングする。`main` への push をトリガ
 通信先を Firebase に限定する CSP をビルド時に `index.html` へ挿入し、ブラウザ側で他の宛先への通信を塞ぐ。依存パッケージに将来悪意のあるコードが混入しても、家計データを第三者へ送信できない。
 
 - `connect-src`: Firestore（`firestore.googleapis.com`）と Authentication（`identitytoolkit.googleapis.com`, `securetoken.googleapis.com`）だけ
-- `script-src` の `https://apis.google.com` と `frame-src` の認証ドメイン（`<project>.firebaseapp.com`）: Google ログインのポップアップとのやり取りに Firebase が使う。認証ドメインはビルド時の設定値から埋め込む
-- ログインはポップアップ方式にする。リダイレクト方式は、アプリ（github.io）と認証ドメイン（firebaseapp.com）が別のため、Safari などのサードパーティ Cookie 制限で失敗する
+- `script-src` の `https://apis.google.com` と `frame-src` の認証ドメイン（`<project>.firebaseapp.com`）: Google ログインの中継ページとのやり取りに Firebase が使う。認証ドメインはビルド時の設定値から埋め込む（本番では配信ドメインと同じ）
+- `frame-ancestors 'self'` は meta タグでは指定できないため、Firebase Hosting のレスポンスヘッダーで指定する。`'none'` にしないのは、Firebase がログインの中継に同じドメインの `/__/auth/iframe` を埋め込むため
 - 保存先のデータベースはアプリの管理者の Firebase プロジェクトなので、管理者は技術的にはデータを閲覧できる。ログイン画面と README でこの点を明示する
 
 - `style-src` に `'unsafe-inline'` が必要: React と Recharts が `style` 属性を使うため
 - CSP は本番ビルドにのみ適用する: 開発時は Vite の HMR が WebSocket を使うため（`vite.config.ts` の `apply: 'build'`）
-- `frame-ancestors` は meta タグでは指定できず、GitHub Pages ではヘッダーも設定できないため、クリックジャッキングは防げない。ただし破壊的操作（全データ削除）には `window.confirm` を挟んでおり、ネイティブダイアログは重ねてクリックさせられないため実害は限定的。アカウント削除は本人確認のポップアップをクリック直後に開く必要があるため `window.confirm` を挟めないが、Google の再ログインが必要なので重ねてクリックさせるだけでは実行できない
+- アカウント削除は、開発時の本人確認のポップアップをクリック直後に開く必要があるため `window.confirm` を挟まず、画面上の 2 段階のボタンで確認する。Google の再ログインが必要なので、誤操作だけでは実行されない
 
 ### データ消失対策
 

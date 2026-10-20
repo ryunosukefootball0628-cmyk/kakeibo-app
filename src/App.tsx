@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { UserProvider, useAuthState } from './auth/session';
+import { completeRedirect, UserProvider, useAuthState } from './auth/session';
 import Layout from './components/Layout';
 import { initializeUserData } from './db/operations';
-import { reportSyncError } from './db/syncStatus';
+import { isCancelledPopup, reportSyncError } from './db/syncStatus';
 import LoginPage from './features/auth/LoginPage';
 import SetupRequiredPage from './features/auth/SetupRequiredPage';
 import DashboardPage from './features/dashboard/DashboardPage';
@@ -26,6 +26,13 @@ export default function App() {
 function AuthGate() {
   const user = useAuthState();
   const uid = user?.uid;
+
+  // Google の画面から戻ってきたときのログイン・本人確認の失敗を表示できるようにする
+  useEffect(() => {
+    completeRedirect().catch((e) => {
+      if (!isCancelledPopup(e)) reportSyncError(e);
+    });
+  }, []);
 
   // 初回ログイン時の初期データ作成は裏で進める (届いた時点で各画面に反映される)
   useEffect(() => {

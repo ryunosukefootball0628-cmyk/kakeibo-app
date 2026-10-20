@@ -1,8 +1,11 @@
 import {
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   reauthenticateWithPopup,
+  reauthenticateWithRedirect,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -15,22 +18,57 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, firestore } from '../firebase';
 
 /**
- * リダイレクト方式はアプリと認証ドメインが別 (github.io と firebaseapp.com) だと
- * Safari などのサードパーティ Cookie 制限で失敗するため、ポップアップ方式を使う。
+ * ログインの中継ページ (authDomain の /__/auth/handler) がアプリと同じドメインにあるとき
+ * (Firebase Hosting で配信しているとき) は、同じタブで Google の画面へ移るリダイレクト方式を使う。
+ * スマホではポップアップが別タブで開かれ、途中の情報が失われて失敗することがあるため。
+ *
+ * 別ドメインのまま (localhost での開発時) リダイレクトすると、ブラウザのストレージ分離で
+ * 中継ページの情報が読めずに失敗するので、そのときだけポップアップ方式にする。
  */
+export const usesRedirect = auth.config.authDomain === window.location.host;
+
 function googleProvider() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   return provider;
 }
 
+/** リダイレクト方式では Google の画面へ移動するため、この Promise は完了しない */
 export async function signInWithGoogle(): Promise<void> {
-  await signInWithPopup(auth, googleProvider());
+  if (usesRedirect) {
+    await signInWithRedirect(auth, googleProvider());
+  } else {
+    await signInWithPopup(auth, googleProvider());
+  }
 }
 
-/** アカウント削除のような操作の前に、本人であることを確かめ直す */
+/**
+ * リダイレクト方式でのログイン・本人確認の失敗は、戻ってきたページの読み込み時に
+ * ここで受け取る (呼ばないとエラーが握りつぶされる)。
+ */
+export async function completeRedirect(): Promise<void> {
+  await getRedirectResult(auth);
+}
+
+/**
+ * アカウント削除の前に、本人であることを確かめ直す。
+ * リダイレクト方式では Google の画面へ移動し、戻ってきたら元の画面が読み込み直される。
+ */
 export async function reauthenticate(user: User): Promise<void> {
-  await reauthenticateWithPopup(user, googleProvider());
+  if (usesRedirect) {
+    await reauthenticateWithRedirect(user, googleProvider());
+  } else {
+    await reauthenticateWithPopup(user, googleProvider());
+  }
+}
+
+/**
+ * Firebase はアカウント削除などに「直近 5 分以内のログイン」を求める。
+ * 削除の途中で期限が切れないよう、少し余裕を持って判定する。
+ */
+export async function isRecentlySignedIn(user: User): Promise<boolean> {
+  const { authTime } = await user.getIdTokenResult();
+  return Date.now() - Date.parse(authTime) < 4 * 60 * 1000;
 }
 
 /** 未送信の書き込みが残っているか。オフラインだと送信が終わらないので一定時間で見切る */
