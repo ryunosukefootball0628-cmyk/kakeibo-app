@@ -92,6 +92,7 @@ users/{uid}/recurringExpenses/{id}   RecurringExpense
 アクセス制御は `firestore.rules` で行う。
 
 - `users/{uid}` 以下は `request.auth.uid == uid` の本人だけが読み書きできる。それ以外のパスはすべて拒否
+- Google でログインしたアカウント（`sign_in_provider == 'google.com'`）に限る。コンソールで匿名ログインやメール／パスワードを誤って有効にしても、API キーだけで大量に作れるアカウントからは使えない
 - 書き込みは下表の項目・型・範囲に一致するものだけを許可する（想定外の項目、負や小数の金額、巨大なメモなど）。保存する項目の一覧は `src/db/collections.ts` の `FIELDS` と揃える
 - ルールは `npm run test:rules` でエミュレーター上のテスト（`tests/firestore.rules.test.mjs`）により検証する
 
@@ -260,7 +261,8 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 | 公開範囲 | リポジトリは Public。公開されるのはソースコードのみで、家計簿のデータは Firestore にあるためリポジトリには含まれない |
 | Firebase の設定値 | `apiKey` などはブラウザに配信される公開値だが、フォークした人が自分のプロジェクトに差し替えやすいようリポジトリには含めない。開発時は `.env.local`、Actions ではリポジトリの Variables（`FIREBASE_API_KEY` など）から渡す。未登録ならビルドを失敗させる |
 | ログインできるドメイン | Firebase Authentication の「承認済みドメイン」に `<project>.firebaseapp.com` と localhost は最初から入っている。追加したサイトのドメインは、承認済みドメインと Google Cloud の OAuth クライアントの「承認済みのリダイレクト URI」（`https://<サイト名>.web.app/__/auth/handler`）に手で追加する。LAN のアドレス（スマホから `http://192.168.x.x:5173` で開く場合）は未登録のためログインできない |
-| ルールの反映 | `firestore.rules` は自動では反映されない（GitHub Actions のサービスアカウントには Hosting の権限しか無い）。変更したら `firebase deploy --only firestore:rules` で反映する |
+| ルールの反映 | `firestore.rules` は自動では反映されない（GitHub Actions のサービスアカウントにはルールを変更する権限が無い）。変更したら `firebase deploy --only firestore:rules` で反映する |
+| デプロイ用サービスアカウント | `firebase init hosting:github` は Hosting の管理者のほかに、Authentication の管理者（全利用者のメールアドレスの閲覧・削除ができる）や Cloud Functions の開発者などのロールも付ける。鍵が漏れたときの被害を Hosting に限るため、不要なロールは IAM で外す（README の「セキュリティのための設定」） |
 
 ### アイコン
 
@@ -287,6 +289,20 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 - `style-src` に `'unsafe-inline'` が必要: React と Recharts が `style` 属性を使うため
 - CSP は本番ビルドにのみ適用する: 開発時は Vite の HMR が WebSocket を使うため（`vite.config.ts` の `apply: 'build'`）
 - アカウント削除は、開発時の本人確認のポップアップをクリック直後に開く必要があるため `window.confirm` を挟まず、画面上の 2 段階のボタンで確認する。Google の再ログインが必要なので、誤操作だけでは実行されない
+
+その他のレスポンスヘッダー（`firebase.json`）:
+
+- `Referrer-Policy: strict-origin-when-cross-origin`: 他サイトへはオリジンだけを送る。`no-referrer` にしないのは、API キーに HTTP リファラーの制限をかけたとき、Firebase の API がリファラーでアクセス元を確かめるため
+- `Permissions-Policy`: カメラ・マイク・位置情報・決済・USB を使わないので無効にする。依存パッケージが乗っ取られても、これらの許可を求められない
+- `Cross-Origin-Opener-Policy` は付けない。Google ログインはアプリ → 中継ページ（`/__/auth/handler`、Firebase が配信するのでこちらのヘッダーは付かない）→ Google の画面と同じタブ内で移動し、途中の情報を sessionStorage で引き継ぐ。ブラウザによってはここで保存領域が切り替わり、iPhone でログインできなくなるおそれがあるため
+
+依存パッケージとデプロイ経路（サプライチェーン）:
+
+- `.npmrc` の `ignore-scripts=true` で、`npm install` / `npm ci` 時に依存パッケージのインストールスクリプトを実行しない。乗っ取られたパッケージが手元の `firebase login` の認証情報や Actions のシークレットを盗むのを防ぐ。今の依存（esbuild, protobufjs, @firebase/util）のスクリプトは無くても動く
+- GitHub Actions の外部 Action はコミット SHA で固定し、デプロイ時に使う firebase-tools の版も固定する（既定は `latest`）。サービスアカウントの鍵を扱うため、タグの付け替えや新しい版の乗っ取りで中身が差し替わらないようにする
+- ワークフローの既定の権限は `permissions: {}` とし、各ジョブに必要な分だけ与える。`actions/checkout` は `persist-credentials: false` で GITHUB_TOKEN を作業ツリーに残さない
+- Dependabot（`.github/dependabot.yml`）が npm と Actions の更新を週 1 回 PR で知らせる。公開直後の版は乗っ取りに気づかれる前のことがあるので、7 日待ってから提案させる
+- `npm audit` に残る `@grpc/grpc-js` の指摘は、Node.js で動く gRPC サーバー向けの問題。ブラウザ版の Firestore は gRPC を使わず、Node.js で使うのはルールのテストだけなので、配信するアプリには影響しない（Firebase が依存の版を上げるまで残る）
 
 ### データ消失対策
 

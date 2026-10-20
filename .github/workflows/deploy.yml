@@ -9,6 +9,11 @@ concurrency:
   group: deploy
   cancel-in-progress: true
 
+# 権限は各ジョブで必要なものだけを与える
+permissions: {}
+
+# 外部の Action は、タグの付け替えで中身を差し替えられないようコミット SHA で固定する
+# (.github/dependabot.yml の設定で Dependabot が更新の PR を出す)
 jobs:
   # アプリ本体は Firebase Hosting で配信する (ログインの中継ページと同じドメインにするため)。
   # firebase.json に書いた全サイト (現在のアドレスと、転送用の以前のアドレス) へ同じものを公開する
@@ -17,11 +22,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
+      # 依存パッケージのインストールスクリプトは .npmrc の ignore-scripts で実行しない
       - run: npm ci
       # Firebase の Web 設定はリポジトリの Settings > Secrets and variables > Actions >
       # Variables に登録する (公開値なので Secrets ではなく Variables)。
@@ -45,11 +53,13 @@ jobs:
             exit 1
           fi
           npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      # サービスアカウントの鍵を渡すので、中で使う firebase-tools の版も固定する (既定は latest)
+      - uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KAKEIBO_APP_EA14F }}
           projectId: ${{ vars.FIREBASE_PROJECT_ID }}
           channelId: live
+          firebaseToolsVersion: 15.34.0
 
   # 以前の配信先 (GitHub Pages) には移転案内を置く。移転先の公開が済んでから切り替える
   moved-notice:
@@ -63,13 +73,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Fill in the new address
         env:
           APP_URL: https://${{ vars.FIREBASE_AUTH_DOMAIN }}/
         run: sed -i "s#__APP_URL__#${APP_URL}#g" moved/index.html
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: moved
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

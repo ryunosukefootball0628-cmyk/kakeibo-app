@@ -28,8 +28,13 @@ const env = await initializeTestEnvironment({
   firestore: { rules: readFileSync('firestore.rules', 'utf8') },
 });
 
-const alice = () => env.authenticatedContext('alice').firestore();
-const bob = () => env.authenticatedContext('bob').firestore();
+// 本番と同じく Google でログインしたアカウントとして振る舞う (既定のテスト用トークンは 'custom')
+const signedIn = (uid, provider = 'google.com') =>
+  env
+    .authenticatedContext(uid, { firebase: { sign_in_provider: provider, identities: {} } })
+    .firestore();
+const alice = () => signedIn('alice');
+const bob = () => signedIn('bob');
 const guest = () => env.unauthenticatedContext().firestore();
 
 const transaction = {
@@ -70,6 +75,15 @@ describe('本人だけが読み書きできる', () => {
   test('ログインしていなければ何もできない', async () => {
     await assertFails(getDoc(txRef(guest())));
     await assertFails(setDoc(txRef(guest()), transaction));
+  });
+
+  test('Google 以外の方法でログインしたアカウントは自分の場所でも使えない', async () => {
+    for (const provider of ['anonymous', 'password', 'custom']) {
+      const db = signedIn('alice', provider);
+      await assertFails(getDoc(txRef(db)));
+      await assertFails(setDoc(txRef(db), transaction));
+      await assertFails(setDoc(doc(db, 'users', 'alice'), { createdAt: '2026-10-16T03:00:00.000Z' }));
+    }
   });
 
   test('プロフィールは本人だけが読み取り・削除できる', async () => {

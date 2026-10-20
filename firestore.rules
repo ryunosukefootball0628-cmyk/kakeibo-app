@@ -7,8 +7,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Google でログインしたアカウントに限る。コンソールで匿名ログインやメール／パスワードを
+    // 誤って有効にしても、API キーだけで作れるアカウントからは使えないようにする
     function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     function isText(value, max) {

@@ -57,7 +57,7 @@ npm install
 6. 「プロジェクトの設定」→「マイアプリ」でウェブアプリ（`</>`）を追加し、表示される `firebaseConfig` の値を控える
 7. `.env.example` を `.env.local` という名前でコピーし、控えた値を書き込む
 
-`firebaseConfig` の値はブラウザに配信される公開値で、秘密情報ではありません（アクセスの制限はルールが担います）。それでも気になる場合は、Google Cloud コンソールで API キーに HTTP リファラーの制限（公開先のドメインと `localhost`）をかけておくと安心です。
+`firebaseConfig` の値はブラウザに配信される公開値で、秘密情報ではありません（アクセスの制限はルールが担います）。ただし API キーは、使える API と呼び出し元のドメインを絞っておいてください（下の「セキュリティのための設定」）。
 
 `.firebaserc` の `default` も自分のプロジェクト ID に書き換えてください。
 
@@ -127,6 +127,22 @@ npx firebase-tools deploy --only firestore:rules
 ```
 
 GitHub Pages（以前の配信先）には、移転案内のページ（[moved/index.html](moved/index.html)）を公開しています。
+
+### セキュリティのための設定
+
+コードの外（各サービスの管理画面）でしかできない設定です。公開したら一度行ってください。
+
+1. **デプロイ用サービスアカウントの権限を絞る。** `firebase init hosting:github` が作るサービスアカウント（`github-action-<数字>@<プロジェクト ID>.iam.gserviceaccount.com`）には、デプロイに不要な権限も付きます。[Google Cloud コンソールの IAM](https://console.cloud.google.com/iam-admin/iam) でこのアカウントの鉛筆アイコンを押し、次のロールを削除します。Secrets の鍵が漏れても、全利用者のアカウント情報を見たりプログラムを動かしたりできないようにするためです。削除後に GitHub の Actions タブから Deploy を手動実行（Run workflow）し、成功することを確かめてください
+   - Firebase Authentication 管理者（`roles/firebaseauth.admin`。全利用者のメールアドレスの閲覧・削除ができる）
+   - Cloud Functions 開発者（`roles/cloudfunctions.developer`）
+   - Cloud Run 閲覧者（`roles/run.viewer`）
+
+   残すのは「Firebase Hosting 管理者」「Service Usage ユーザー」「API キー閲覧者」です
+2. **API キーを絞る。** [Google Cloud コンソールの「認証情報」](https://console.cloud.google.com/apis/credentials)で `firebaseConfig.apiKey` と同じ値のキー（Browser key (auto created by Firebase)）を開き、次のように設定します。同じプロジェクトで他の API（Gemini API など）を有効にしたとき、公開されているこのキーで呼び出されないようにするためです。保存後、ログインと記録の保存ができることを確かめてください
+   - アプリケーションの制限: 「ウェブサイト」を選び、`https://kakeibo-pocket.web.app/*`、`https://kakeibo-pocket.firebaseapp.com/*`、`https://kakeibo-app-ea14f.web.app/*`、`https://kakeibo-app-ea14f.firebaseapp.com/*`、`http://localhost:5173/*` を追加する
+   - API の制限: 「キーを制限」を選び、Identity Toolkit API、Token Service API、Cloud Firestore API の 3 つにする
+3. **Authentication のログイン方法は Google だけにする。** 匿名やメール／パスワードは有効にしない（ルールでも Google 以外のアカウントは拒否しています）
+4. **Dependabot を有効にする。** リポジトリの Settings →「Advanced Security」（または「Code security」）で「Dependabot alerts」と「Dependabot security updates」を有効にすると、使っているパッケージに脆弱性が見つかったときに通知と修正の PR が届きます
 
 設計の詳細は [docs/DESIGN.md](docs/DESIGN.md) を参照してください。
 
