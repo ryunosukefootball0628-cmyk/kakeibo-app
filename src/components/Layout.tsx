@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import SyncStatus from './SyncStatus';
 
@@ -29,16 +30,35 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
 ];
 
 export default function Layout() {
+  // スマホ幅でだけ使う。PC 幅ではメニューを常に出し、開閉ボタンも隠す
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="sidebar-title">家計簿</div>
-        <nav className="nav">
+      <aside className={menuOpen ? 'sidebar open' : 'sidebar'}>
+        <div className="sidebar-header">
+          <div className="sidebar-title">家計簿</div>
+          <button
+            className="menu-toggle"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="main-nav"
+          >
+            {menuOpen ? '✕ 閉じる' : '☰ メニュー'}
+          </button>
+        </div>
+        <nav className="nav" id="main-nav">
           {NAV_GROUPS.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-group-label">{group.label}</div>
               {group.items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  // 画面を選んだら閉じて、その画面の中身を見せる
+                  onClick={() => setMenuOpen(false)}
+                >
                   {item.label}
                 </NavLink>
               ))}
