@@ -87,6 +87,11 @@ a {
   padding: 0 0.5rem 1rem;
 }
 
+/* メニューの開閉ボタンはスマホ幅でだけ出す */
+.menu-toggle {
+  display: none;
+}
+
 .nav {
   display: flex;
   flex-direction: column;
@@ -142,18 +147,29 @@ a {
     padding: 0.75rem;
   }
 
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .sidebar-title {
+    padding: 0 0.25rem;
+  }
+
+  .menu-toggle {
+    display: block;
+  }
+
+  /* 閉じているあいだは隠し、開いたら PC と同じく縦に並べる */
   .nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 0.25rem;
-  }
-
-  .nav a {
-    white-space: nowrap;
-  }
-
-  .nav-group-label {
     display: none;
+    margin-top: 0.5rem;
+  }
+
+  .sidebar.open .nav {
+    display: flex;
   }
 
   .main {
