@@ -594,9 +594,19 @@ tbody.sorting tr.dragging {
   container-type: inline-size;
 }
 
+/* スマホではマスを少しでも広く取るため、.main の左右の余白を打ち消して画面の端まで広げる */
 @media (max-width: 520px) {
   .calendar-card {
-    padding: 0.75rem 0.5rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding: 0.75rem 0.15rem;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .calendar-card > .spread {
+    padding: 0 0.6rem;
   }
 }
 
