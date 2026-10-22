@@ -78,7 +78,7 @@ export default function DataPage() {
     run(async () => {
       const data = await exportBackup();
       downloadJson(data, 'kakeibo-backup');
-      return `${data.transactions.length}件の取引をエクスポートしました。`;
+      return `${data.transactions.length}件の取引と${data.shifts.length}件のシフトをエクスポートしました。`;
     });
 
   const handleImport = (file: File) => {
@@ -103,7 +103,7 @@ export default function DataPage() {
   const handleReset = () => {
     if (
       !window.confirm(
-        'すべての取引・カテゴリ・支払い方法・定期支出を削除し、初期状態に戻します。この操作は取り消せません。実行しますか?',
+        'すべての取引・カテゴリ・支払い方法・定期支出・勤務先・シフトを削除し、初期状態に戻します。この操作は取り消せません。実行しますか?',
       )
     ) {
       return;
@@ -189,7 +189,7 @@ export default function DataPage() {
       <div className="card">
         <h2>インポート</h2>
         <p className="muted">
-          エクスポートした JSON を読み込みます。現在のデータはすべて置き換えられます。
+          エクスポートした JSON を読み込みます。現在のデータはすべて置き換えられます。シフト機能を追加する前に保存したファイルを読み込むと、勤務先とシフトは空になります。
         </p>
         <input
           ref={fileInput}

@@ -685,3 +685,123 @@ tbody.sorting tr.dragging {
     display: inline;
   }
 }
+
+/* ---------- シフト・給与 ---------- */
+
+/* カレンダーのマスに入るシフト。色は勤務先ごと (--chip-color) */
+.shift-chip {
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  padding: 0 0.3rem;
+  border-left: 3px solid var(--chip-color);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--chip-color) 16%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.shift-chip .short {
+  display: none;
+}
+
+.shift-chip + .shift-chip {
+  margin-top: 2px;
+}
+
+/* 狭いマスでは開始時刻だけにする (上の指定より後ろに書いて上書きする) */
+@container (max-width: 560px) {
+  .shift-chip {
+    font-size: 0.6rem;
+    padding: 0 0.15rem;
+    border-left-width: 2px;
+  }
+
+  .shift-chip .full {
+    display: none;
+  }
+
+  .shift-chip .short {
+    display: inline;
+  }
+}
+
+.template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.template-chip {
+  border-left: 3px solid var(--chip-color, var(--border));
+}
+
+/* カードの中に入れるフォームや記録の欄 */
+.subcard {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+.choice-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.choice-group legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.choice + .choice {
+  margin-top: 0.6rem;
+}
+
+.choice input[type='radio'] {
+  width: auto;
+  margin-top: 0.3rem;
+}
+
+.pay-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .pay-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+tr.total-row td {
+  font-weight: 700;
+}
+
+.pay-details {
+  margin-top: 0.75rem;
+}
+
+.pay-details summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}

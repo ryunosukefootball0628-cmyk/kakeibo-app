@@ -10,6 +10,7 @@ import { newId } from '../../db/seed';
 import { usePaymentMethods } from '../../hooks/useData';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import type { PaymentMethod, PaymentMethodKind } from '../../types';
+import { closingRuleLabel } from '../../utils/billing';
 
 const KIND_LABEL: Record<PaymentMethodKind, string> = {
   cash: '現金',
@@ -33,12 +34,6 @@ const emptyForm: FormState = {
   closingDay: '31',
   paymentDay: '27',
   paymentMonthOffset: '1',
-};
-
-const OFFSET_LABEL: Record<string, string> = {
-  '0': '当月',
-  '1': '翌月',
-  '2': '翌々月',
 };
 
 export default function PaymentMethodsPage() {
@@ -234,10 +229,14 @@ export default function PaymentMethodsPage() {
                       <span className="tag">{KIND_LABEL[method.kind]}</span>
                     </td>
                     <td className="muted">
-                      {method.kind === 'credit_card' && method.closingDay != null
-                        ? `${method.closingDay === 31 ? '月末' : `${method.closingDay}日`}締め / ${
-                            OFFSET_LABEL[String(method.paymentMonthOffset ?? 1)]
-                          }${method.paymentDay === 31 ? '月末' : `${method.paymentDay}日`}払い`
+                      {method.kind === 'credit_card' &&
+                      method.closingDay != null &&
+                      method.paymentDay != null
+                        ? closingRuleLabel({
+                            closingDay: method.closingDay,
+                            paymentDay: method.paymentDay,
+                            paymentMonthOffset: method.paymentMonthOffset ?? 1,
+                          })
                         : '—'}
                     </td>
                     <td>

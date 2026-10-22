@@ -40,15 +40,37 @@ service cloud.firestore {
       return isIntIn(value, 0, 1000000000000);
     }
 
+    function isOptionalAmount(data, key) {
+      return !(key in data) || isAmount(data[key]);
+    }
+
     // 日付は YYYY-MM-DD (月は 01〜12、日は 01〜31)。ありえない値で画面の集計が崩れないようにする
     function isDate(value) {
       return value is string
         && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])');
     }
 
+    function isYearMonth(value) {
+      return value is string && value.matches('[0-9]{4}-(0[1-9]|1[0-2])');
+    }
+
     // 表示順。NaN や Infinity、極端な値で並び替えが壊れないよう範囲を決める
     function isSortOrder(value) {
       return value is number && value >= -1000000 && value <= 1000000;
+    }
+
+    // 時刻は HH:MM (00:00〜23:59)
+    function isTime(value) {
+      return value is string && value.matches('([01][0-9]|2[0-3]):[0-5][0-9]');
+    }
+
+    // 時給・交通費 (円単位の整数、上限 100 万円)
+    function isWage(value) {
+      return isIntIn(value, 0, 1000000);
+    }
+
+    function isOptionalWage(data, key) {
+      return !(key in data) || isWage(data[key]);
     }
 
     function isProfile(data) {
@@ -57,7 +79,7 @@ service cloud.firestore {
 
     function isTransaction(data) {
       return data.keys().hasAll(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'workplaceId', 'payMonth', 'grossPay', 'createdAt', 'updatedAt'])
         && data.type in ['income', 'expense']
         && isDate(data.date)
         && isAmount(data.amount)
@@ -65,6 +87,9 @@ service cloud.firestore {
         && isText(data.paymentMethodId, 64)
         && isOptionalText(data, 'memo', 1000)
         && isOptionalText(data, 'recurringSourceId', 64)
+        && isOptionalText(data, 'workplaceId', 64)
+        && (!('payMonth' in data) || isYearMonth(data.payMonth))
+        && isOptionalAmount(data, 'grossPay')
         && isText(data.createdAt, 40)
         && isText(data.updatedAt, 40);
     }
@@ -103,6 +128,53 @@ service cloud.firestore {
         && isOptionalText(data, 'memo', 1000);
     }
 
+    function isWorkplace(data) {
+      return data.keys().hasAll(['name', 'color', 'closingDay', 'paymentDay', 'paymentMonthOffset', 'nightPremiumPercent', 'overtimePremiumPercent', 'isActive', 'sortOrder'])
+        && data.keys().hasOnly(['name', 'color', 'closingDay', 'paymentDay', 'paymentMonthOffset', 'nightPremiumPercent', 'overtimePremiumPercent', 'isActive', 'sortOrder'])
+        && isText(data.name, 100)
+        && isText(data.color, 32)
+        && isIntIn(data.closingDay, 1, 31)
+        && isIntIn(data.paymentDay, 1, 31)
+        && isIntIn(data.paymentMonthOffset, 0, 2)
+        && isIntIn(data.nightPremiumPercent, 0, 100)
+        && isIntIn(data.overtimePremiumPercent, 0, 100)
+        && data.isActive is bool
+        && isSortOrder(data.sortOrder);
+    }
+
+    function isPayRate(data) {
+      return data.keys().hasAll(['workplaceId', 'startDate', 'hourlyWage', 'transportFee'])
+        && data.keys().hasOnly(['workplaceId', 'startDate', 'hourlyWage', 'saturdayWage', 'sundayWage', 'holidayWage', 'transportFee'])
+        && isText(data.workplaceId, 64)
+        && isDate(data.startDate)
+        && isWage(data.hourlyWage)
+        && isOptionalWage(data, 'saturdayWage')
+        && isOptionalWage(data, 'sundayWage')
+        && isOptionalWage(data, 'holidayWage')
+        && isWage(data.transportFee);
+    }
+
+    function isShift(data) {
+      return data.keys().hasAll(['workplaceId', 'date', 'startTime', 'endTime', 'breakMinutes'])
+        && data.keys().hasOnly(['workplaceId', 'date', 'startTime', 'endTime', 'breakMinutes', 'memo'])
+        && isText(data.workplaceId, 64)
+        && isDate(data.date)
+        && isTime(data.startTime)
+        && isTime(data.endTime)
+        && isIntIn(data.breakMinutes, 0, 1439)
+        && isOptionalText(data, 'memo', 1000);
+    }
+
+    function isShiftTemplate(data) {
+      return data.keys().hasAll(['workplaceId', 'name', 'startTime', 'endTime', 'breakMinutes'])
+        && data.keys().hasOnly(['workplaceId', 'name', 'startTime', 'endTime', 'breakMinutes'])
+        && isText(data.workplaceId, 64)
+        && isText(data.name, 50)
+        && isTime(data.startTime)
+        && isTime(data.endTime)
+        && isIntIn(data.breakMinutes, 0, 1439);
+    }
+
     match /users/{uid} {
       allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid) && isProfile(request.resource.data);
@@ -125,6 +197,26 @@ service cloud.firestore {
       match /recurringExpenses/{id} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && isId(id) && isRecurringExpense(request.resource.data);
+      }
+
+      match /workplaces/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isWorkplace(request.resource.data);
+      }
+
+      match /payRates/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isPayRate(request.resource.data);
+      }
+
+      match /shifts/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isShift(request.resource.data);
+      }
+
+      match /shiftTemplates/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isShiftTemplate(request.resource.data);
       }
     }
   }
