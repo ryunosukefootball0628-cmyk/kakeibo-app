@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import SyncStatus from './SyncStatus';
+import UpdateNotice from './UpdateNotice';
 
 const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = [
   {
@@ -70,6 +71,7 @@ export default function Layout() {
         <SyncStatus />
         <Outlet />
       </main>
+      <UpdateNotice />
     </div>
   );
 }
