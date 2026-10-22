@@ -14,11 +14,12 @@ permissions: {}
 
 # 外部の Action は、タグの付け替えで中身を差し替えられないようコミット SHA で固定する
 # (.github/dependabot.yml の設定で Dependabot が更新の PR を出す)
+# 実行環境も ubuntu-latest だと移行のたびに知らないうちに中身が変わるため、版を明示する
 jobs:
   # アプリ本体は Firebase Hosting で配信する (ログインの中継ページと同じドメインにするため)。
   # firebase.json に書いた全サイト (現在のアドレスと、転送用の以前のアドレス) へ同じものを公開する
   firebase-hosting:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -64,7 +65,7 @@ jobs:
   # 以前の配信先 (GitHub Pages) には移転案内を置く。移転先の公開が済んでから切り替える
   moved-notice:
     needs: firebase-hosting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write
