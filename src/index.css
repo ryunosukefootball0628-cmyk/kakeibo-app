@@ -430,6 +430,45 @@ td.memo {
   min-width: 8rem;
 }
 
+/* 行の並べ替え (src/hooks/useDragReorder.ts) */
+
+td.drag-cell {
+  width: 1%;
+  padding-right: 0;
+}
+
+.drag-handle {
+  display: flex;
+  padding: 0.35rem 0.4rem;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+  /* 指でつまんで動かすあいだ、画面のスクロールや文字の選択が始まらないようにする */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+tbody.sorting,
+tbody.sorting .drag-handle {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+tbody.sorting tr {
+  transition: transform 0.15s ease;
+}
+
+tbody.sorting tr.dragging {
+  position: relative;
+  z-index: 1;
+  transition: none;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+
 .tag {
   display: inline-block;
   padding: 0.1rem 0.45rem;
