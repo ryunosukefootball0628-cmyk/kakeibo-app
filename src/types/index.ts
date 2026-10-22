@@ -44,6 +44,15 @@ export interface PaymentMethod {
   paymentDay?: number;
   /** 締め月から支払月までの差。0 = 当月払い, 1 = 翌月払い, 2 = 翌々月払い */
   paymentMonthOffset?: number;
+  /** 引き落とし口座 (credit_card のみ)。kind が bank の支払い方法の id */
+  debitAccountId?: string;
+  /**
+   * 残高を合わせた日 (bank のみ, YYYY-MM-DD)。この日までの入出金は balance に含まれているものとし、
+   * 翌日からの入出金とカードの引き落としを足し引きして今の残高を出す
+   */
+  balanceDate?: string;
+  /** balanceDate の終わりの時点の残高 (円)。balanceDate と組で持つ */
+  balance?: number;
   sortOrder: number;
 }
 

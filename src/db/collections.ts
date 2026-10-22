@@ -79,6 +79,9 @@ const FIELDS: { [K in CollectionName]: Exclude<keyof CollectionTypes[K], 'id'>[]
     'closingDay',
     'paymentDay',
     'paymentMonthOffset',
+    'debitAccountId',
+    'balanceDate',
+    'balance',
     'sortOrder',
   ],
   recurringExpenses: [

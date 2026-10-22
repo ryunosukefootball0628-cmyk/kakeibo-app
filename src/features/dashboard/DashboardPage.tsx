@@ -11,6 +11,7 @@ import {
 import { tooltipStyle } from '../../components/chartTheme';
 import MonthSelector from '../../components/MonthSelector';
 import { recordRecurring } from '../../db/operations';
+import { useAccountData } from '../../hooks/useAccounts';
 import {
   useCategories,
   useLookup,
@@ -20,6 +21,12 @@ import {
   useTransactionsBetween,
 } from '../../hooks/useData';
 import { usePayrolls } from '../../hooks/usePayroll';
+import {
+  accountLedger,
+  balanceAt,
+  debitAccountOf,
+  hasBalance,
+} from '../../utils/balance';
 import {
   billingCycleForPaymentMonth,
   sumTransactionsInPeriod,
@@ -32,7 +39,7 @@ import {
   todayIso,
   yearMonthLabel,
 } from '../../utils/date';
-import { formatSignedYen, formatYen } from '../../utils/money';
+import { formatBalance, formatSignedYen, formatYen } from '../../utils/money';
 import { pendingPayrolls } from '../../utils/payroll';
 import { pendingRecurrings } from '../../utils/recurring';
 
@@ -42,6 +49,23 @@ export default function DashboardPage() {
   const paymentMethods = usePaymentMethods();
   const recurrings = useRecurrings();
   const categoryById = useLookup(categories);
+  const methodById = useLookup(paymentMethods);
+
+  // 口座の残高は選んだ月によらず今日の時点
+  const today = todayIso();
+  const accountData = useAccountData(today);
+  const balances = useMemo(
+    () =>
+      accountData.accounts.filter(hasBalance).map((account) => ({
+        account,
+        balance: balanceAt(
+          account,
+          accountLedger(account, accountData.methods, accountData.transactions, today),
+          today,
+        ),
+      })),
+    [accountData.accounts, accountData.methods, accountData.transactions, today],
+  );
 
   // カードの請求対象期間は前月以前に遡るため、数ヶ月分まとめて取得する
   const wideRange = useMemo(
@@ -122,8 +146,8 @@ export default function DashboardPage() {
   const { payrolls } = usePayrolls(yearMonth);
   const salaryTransactions = useSalaryTransactions(yearMonth, yearMonth);
   const pendingSalaries = useMemo(
-    () => pendingPayrolls(payrolls, salaryTransactions, todayIso()),
-    [payrolls, salaryTransactions],
+    () => pendingPayrolls(payrolls, salaryTransactions, today),
+    [payrolls, salaryTransactions, today],
   );
 
   return (
@@ -155,6 +179,29 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {balances.length > 0 && (
+        <div className="card">
+          <div className="spread" style={{ marginBottom: '0.5rem' }}>
+            <h2 style={{ margin: 0 }}>今日の口座残高</h2>
+            <Link to="/accounts">予定と明細を見る</Link>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <tbody>
+                {balances.map(({ account, balance }) => (
+                  <tr key={account.id}>
+                    <td>{account.name}</td>
+                    <td className={`amount${balance < 0 ? ' expense' : ''}`}>
+                      {accountData.loading ? '…' : formatBalance(balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {pendingSalaries.length > 0 && (
         <div className="card">
@@ -283,6 +330,7 @@ export default function DashboardPage() {
                   <th>カード</th>
                   <th>対象期間</th>
                   <th>支払日</th>
+                  <th>引き落とし口座</th>
                   <th style={{ textAlign: 'right' }}>請求予定額</th>
                 </tr>
               </thead>
@@ -294,6 +342,9 @@ export default function DashboardPage() {
                       {cycle.periodStart} 〜 {cycle.periodEnd}
                     </td>
                     <td>{cycle.paymentDate}</td>
+                    <td className="muted">
+                      {debitAccountOf(method, methodById)?.name ?? '未設定'}
+                    </td>
                     <td className="amount">{formatYen(amount)}</td>
                   </tr>
                 ))}

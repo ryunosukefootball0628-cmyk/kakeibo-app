@@ -169,7 +169,7 @@ export default function TransactionFormPage() {
           </label>
 
           <label className="field">
-            支払い方法
+            {type === 'income' ? '入金先' : '支払い方法'}
             <select
               value={paymentMethodId}
               onChange={(e) => setPaymentMethodId(e.target.value)}

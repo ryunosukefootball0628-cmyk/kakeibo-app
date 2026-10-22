@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import MonthSelector from '../../components/MonthSelector';
-import { usePaymentMethods, useTransactionsBetween } from '../../hooks/useData';
+import {
+  useLookup,
+  usePaymentMethods,
+  useTransactionsBetween,
+} from '../../hooks/useData';
+import { debitAccountOf } from '../../utils/balance';
 import {
   billingCycleForPaymentMonth,
   sumTransactionsInPeriod,
@@ -24,6 +29,7 @@ const KIND_LABEL: Record<string, string> = {
 export default function PaymentMethodReportPage() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const paymentMethods = usePaymentMethods();
+  const methodById = useLookup(paymentMethods);
 
   // 請求対象期間は過去に遡り、支払い予定は先月まで見るため広めに取得する
   const range = useMemo(
@@ -138,7 +144,12 @@ export default function PaymentMethodReportPage() {
         ) : (
           upcoming.map(({ method, cycles }) => (
             <div key={method.id} style={{ marginBottom: '1.25rem' }}>
-              <h3>{method.name}</h3>
+              <h3>
+                {method.name}
+                <span className="muted" style={{ fontWeight: 400, marginLeft: '0.5rem' }}>
+                  引き落とし口座：{debitAccountOf(method, methodById)?.name ?? '未設定'}
+                </span>
+              </h3>
               {cycles.length === 0 ? (
                 <p className="muted">締め日・支払日が未設定です。</p>
               ) : (

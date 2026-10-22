@@ -264,6 +264,38 @@ describe('マスタ・定期支出・プロフィールの形式', () => {
     await assertFails(setDoc(col('card'), { ...card, kind: 'crypto' }));
   });
 
+  test('銀行口座の残高とカードの引き落とし口座', async () => {
+    const col = (id) => doc(alice(), 'users', 'alice', 'paymentMethods', id);
+    const bank = { name: '〇〇銀行', kind: 'bank', balanceDate: '2026-10-22', balance: 123456, sortOrder: 2 };
+    await assertSucceeds(setDoc(col('pm-bank'), { name: '銀行口座', kind: 'bank', sortOrder: 2 }));
+    // 「残高を合わせる」は残高と日付だけを書き換える
+    await assertSucceeds(updateDoc(col('pm-bank'), { balanceDate: '2026-10-22', balance: 0 }));
+    await assertSucceeds(setDoc(col('pm-bank'), { ...bank, balance: 1000000000000 }));
+    await assertFails(setDoc(col('pm-bank'), { ...bank, balance: -1 }));
+    await assertFails(setDoc(col('pm-bank'), { ...bank, balance: 100.5 }));
+    await assertFails(setDoc(col('pm-bank'), { ...bank, balance: '123456' }));
+    await assertFails(setDoc(col('pm-bank'), { ...bank, balanceDate: '2026/10/22' }));
+    const { balance: _balance, ...withoutBalance } = bank;
+    const { balanceDate: _balanceDate, ...withoutDate } = bank;
+    await assertFails(setDoc(col('pm-bank'), withoutBalance));
+    await assertFails(setDoc(col('pm-bank'), withoutDate));
+
+    const card = {
+      name: 'カードA',
+      kind: 'credit_card',
+      closingDay: 31,
+      paymentDay: 27,
+      paymentMonthOffset: 1,
+      debitAccountId: 'pm-bank',
+      sortOrder: 3,
+    };
+    await assertSucceeds(setDoc(col('card'), card));
+    // 引き落とし口座を消したときは設定を外す
+    await assertSucceeds(updateDoc(col('card'), { debitAccountId: deleteField() }));
+    await assertFails(setDoc(col('card'), { ...card, debitAccountId: '' }));
+    await assertFails(setDoc(col('card'), { ...card, debitAccountId: 'x'.repeat(65) }));
+  });
+
   test('定期支出 (毎月・毎年)', async () => {
     const ref = doc(alice(), 'users', 'alice', 'recurringExpenses', 'r1');
     const monthly = {

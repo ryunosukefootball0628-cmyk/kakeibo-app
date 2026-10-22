@@ -22,30 +22,51 @@ import type {
 import { monthRange } from '../utils/date';
 import { compareShifts } from '../utils/shift';
 
+/** 結果が届くまでに返す空配列。毎回同じものを返し、余計な再計算を起こさない */
+const NONE: never[] = [];
+
+export interface LiveResult<T> {
+  items: T[];
+  /** いまの条件での最初の結果がまだ届いていない (届くまでは前の条件の結果を返す) */
+  loading: boolean;
+}
+
 /**
  * クエリの結果を購読し、変更 (他の端末からの更新を含む) のたびに再描画する。
- * 最初の結果が届くまでは空配列を返す。
+ * makeQuery が null のあいだは購読しない。
  */
+function useLiveResult<T>(
+  makeQuery: ((uid: string) => Query) | null,
+  deps: DependencyList,
+  transform: (items: T[]) => T[] = (items) => items,
+): LiveResult<T> {
+  const { uid } = useUser();
+  // deps は文字列などの値なので、まとめて文字列にして条件が変わったかを見分ける
+  const key = JSON.stringify([uid, makeQuery !== null, ...deps]);
+  const [result, setResult] = useState<{ key: string; items: T[] }>();
+
+  useEffect(() => {
+    if (!makeQuery) return;
+    return onSnapshot(
+      makeQuery(uid),
+      (snapshot) =>
+        setResult({ key, items: transform(snapshot.docs.map((d) => fromSnapshot<T>(d))) }),
+      reportSyncError,
+    );
+    // makeQuery と transform は deps から決まるため依存に含めない
+  }, [key]);
+
+  if (!makeQuery) return { items: NONE, loading: false };
+  return { items: result?.items ?? NONE, loading: result?.key !== key };
+}
+
+/** 最初の結果が届くまでは空配列を返す */
 function useLiveQuery<T>(
   makeQuery: (uid: string) => Query,
   deps: DependencyList,
-  transform: (items: T[]) => T[] = (items) => items,
+  transform?: (items: T[]) => T[],
 ): T[] {
-  const { uid } = useUser();
-  const [items, setItems] = useState<T[]>([]);
-
-  useEffect(
-    () =>
-      onSnapshot(
-        makeQuery(uid),
-        (snapshot) => setItems(transform(snapshot.docs.map((d) => fromSnapshot<T>(d)))),
-        reportSyncError,
-      ),
-    // makeQuery と transform は deps から決まるため依存に含めない
-    [uid, ...deps],
-  );
-
-  return items;
+  return useLiveResult(makeQuery, deps, transform).items;
 }
 
 export function useCategories() {
@@ -56,7 +77,12 @@ export function useCategories() {
 }
 
 export function usePaymentMethods() {
-  return useLiveQuery<PaymentMethod>(
+  return usePaymentMethodsResult().items;
+}
+
+/** 読み込み中かも返す。残高のように、読み込む前の空の結果で計算すると誤った値が出るもの向け */
+export function usePaymentMethodsResult() {
+  return useLiveResult<PaymentMethod>(
     (uid) => query(userCollection('paymentMethods', uid), orderBy('sortOrder')),
     [],
   );
@@ -72,14 +98,20 @@ export function useRecurrings() {
 
 /** 日付の新しい順に取得する (start, end は両端を含む) */
 export function useTransactionsBetween(start: string, end: string) {
-  return useLiveQuery<Transaction>(
-    (uid) =>
-      query(
-        userCollection('transactions', uid),
-        where('date', '>=', start),
-        where('date', '<=', end),
-      ),
-    [start, end],
+  return useTransactionsResult({ start, end }).items;
+}
+
+/** 読み込み中かも返す。range が null なら読まない */
+export function useTransactionsResult(range: { start: string; end: string } | null) {
+  return useLiveResult<Transaction>(
+    range &&
+      ((uid) =>
+        query(
+          userCollection('transactions', uid),
+          where('date', '>=', range.start),
+          where('date', '<=', range.end),
+        )),
+    [range?.start, range?.end],
     (items) =>
       items.sort(
         (a, b) =>

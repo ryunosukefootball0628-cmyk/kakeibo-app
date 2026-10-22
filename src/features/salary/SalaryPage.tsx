@@ -17,12 +17,15 @@ import {
   yearMonthOrCurrent,
 } from '../../utils/date';
 import { formatSignedYen, formatYen, MAX_AMOUNT } from '../../utils/money';
-import { salaryRecordsFor, shiftPayYen, type Payroll } from '../../utils/payroll';
+import {
+  SALARY_HISTORY_MONTHS,
+  salaryDepositAccountId,
+  salaryRecordsFor,
+  shiftPayYen,
+  type Payroll,
+} from '../../utils/payroll';
 import { durationLabel, timeRangeLabel } from '../../utils/shift';
 import type { TransactionFormState } from '../transactions/TransactionFormPage';
-
-/** 入金先・カテゴリの初期値を決めるため、さかのぼって見る給料の記録 */
-const HISTORY_MONTHS = 12;
 
 interface RecordForm {
   date: string;
@@ -46,10 +49,8 @@ function initialRecordForm(
     previous?.categoryId ??
     (incomes.find((c) => c.id === 'cat-salary') ?? incomes[0])?.id ??
     '';
-  const paymentMethodId =
-    previous?.paymentMethodId ??
-    (paymentMethods.find((m) => m.kind === 'bank') ?? paymentMethods[0])?.id ??
-    '';
+  // 口座残高の画面で給料の見込みを入れる口座と同じにする
+  const paymentMethodId = salaryDepositAccountId(payroll.workplace.id, history, paymentMethods);
   const { month } = parseYearMonth(payroll.cycle.paymentYearMonth);
   return {
     date: payroll.cycle.paymentDate,
@@ -75,7 +76,7 @@ export default function SalaryPage() {
 
   const { payrolls, workplaces } = usePayrolls(yearMonth);
   const salaryTransactions = useSalaryTransactions(
-    addMonths(yearMonth, -HISTORY_MONTHS),
+    addMonths(yearMonth, -SALARY_HISTORY_MONTHS),
     yearMonth,
   );
   const categories = useCategories();
