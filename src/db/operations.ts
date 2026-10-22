@@ -138,8 +138,19 @@ export function savePaymentMethod(method: PaymentMethod): void {
   );
 }
 
-export function deletePaymentMethod(id: string): void {
-  inBackground(deleteDoc(itemRef('paymentMethods', id)));
+/** 銀行口座を消すときは、そこを引き落とし口座にしているカードの設定も外す */
+export function deletePaymentMethod(id: string, paymentMethods: PaymentMethod[]): void {
+  const batch = writeBatch(firestore);
+  for (const card of paymentMethods.filter((m) => m.debitAccountId === id)) {
+    batch.update(itemRef('paymentMethods', card.id), { debitAccountId: deleteField() });
+  }
+  batch.delete(itemRef('paymentMethods', id));
+  inBackground(batch.commit());
+}
+
+/** 銀行口座の残高を合わせる。balance は balanceDate の終わりの時点の残高 */
+export function setAccountBalance(id: string, balanceDate: string, balance: number): void {
+  inBackground(updateDoc(itemRef('paymentMethods', id), { balanceDate, balance }));
 }
 
 export function reorderPaymentMethods(ordered: PaymentMethod[]): void {

@@ -93,3 +93,10 @@ export function dateLabel(isoDate: string): string {
 export function recentYearMonths(ym: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => addMonths(ym, i - (n - 1)));
 }
+
+/** from〜to の年月を古い順に返す (両端を含む。from が to より後なら空) */
+export function yearMonthsBetween(from: string, to: string): string[] {
+  const months: string[] = [];
+  for (let ym = from; ym <= to; ym = addMonths(ym, 1)) months.push(ym);
+  return months;
+}

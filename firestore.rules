@@ -103,14 +103,19 @@ service cloud.firestore {
         && isSortOrder(data.sortOrder);
     }
 
+    // 銀行口座の残高 (balance) は、残高を合わせた日 (balanceDate) と組で持つ
     function isPaymentMethod(data) {
       return data.keys().hasAll(['name', 'kind', 'sortOrder'])
-        && data.keys().hasOnly(['name', 'kind', 'closingDay', 'paymentDay', 'paymentMonthOffset', 'sortOrder'])
+        && data.keys().hasOnly(['name', 'kind', 'closingDay', 'paymentDay', 'paymentMonthOffset', 'debitAccountId', 'balanceDate', 'balance', 'sortOrder'])
         && isText(data.name, 100)
         && data.kind in ['cash', 'bank', 'credit_card']
         && isOptionalIntIn(data, 'closingDay', 1, 31)
         && isOptionalIntIn(data, 'paymentDay', 1, 31)
         && isOptionalIntIn(data, 'paymentMonthOffset', 0, 12)
+        && (!('debitAccountId' in data) || isText(data.debitAccountId, 64))
+        && (!('balanceDate' in data) || isDate(data.balanceDate))
+        && isOptionalAmount(data, 'balance')
+        && ('balance' in data) == ('balanceDate' in data)
         && isSortOrder(data.sortOrder);
     }
 

@@ -805,3 +805,52 @@ tr.total-row td {
   color: var(--accent);
   margin-bottom: 0.5rem;
 }
+
+/* ---------- 口座残高 ---------- */
+
+.balance-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+/* 入出金の内容は、メモや期間の説明を折り返して表の幅を抑える */
+td.ledger-label {
+  white-space: normal;
+  min-width: 11rem;
+}
+
+/* 入出金の表。スマホなど狭いときは残高の列をやめ、入出金の下に出して横にはみ出さないようにする */
+.ledger {
+  container-type: inline-size;
+}
+
+.ledger-inline-balance {
+  display: none;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.ledger-inline-balance.expense {
+  color: var(--expense);
+}
+
+@container (max-width: 520px) {
+  .ledger th,
+  .ledger td {
+    padding: 0.5rem 0.3rem;
+  }
+
+  .ledger .ledger-balance {
+    display: none;
+  }
+
+  .ledger .ledger-inline-balance {
+    display: block;
+  }
+
+  .ledger td.ledger-label {
+    min-width: 0;
+  }
+}

@@ -9,6 +9,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
     items: [
       { to: '/', label: 'ダッシュボード' },
       { to: '/transactions', label: '取引一覧' },
+      { to: '/accounts', label: '口座残高' },
     ],
   },
   {

@@ -1,4 +1,4 @@
-import type { PayRate, Shift, Transaction, Workplace } from '../types';
+import type { PaymentMethod, PayRate, Shift, Transaction, Workplace } from '../types';
 import { cycleForPaymentMonth, type BillingCycle } from './billing';
 import { weekdayOf } from './date';
 import { holidayName } from './holidays';
@@ -223,6 +223,26 @@ export interface Payroll {
   /** 対象期間のシフト (日付・開始の順) */
   pays: ShiftPay[];
   summary: PaySummary;
+}
+
+/** 入金先・カテゴリの初期値を決めるため、さかのぼって見る給料の記録の月数 */
+export const SALARY_HISTORY_MONTHS = 12;
+
+/**
+ * 給料の振込先。前回その勤務先の給料を記録したときの入金先、無ければ最初の銀行口座。
+ * salaryTransactions は日付の新しい順
+ */
+export function salaryDepositAccountId(
+  workplaceId: string,
+  salaryTransactions: Transaction[],
+  paymentMethods: PaymentMethod[],
+): string {
+  const previous = salaryTransactions.find((t) => t.workplaceId === workplaceId);
+  return (
+    previous?.paymentMethodId ??
+    (paymentMethods.find((m) => m.kind === 'bank') ?? paymentMethods[0])?.id ??
+    ''
+  );
 }
 
 /** その勤務先・支給月の給料として記録した取引 */

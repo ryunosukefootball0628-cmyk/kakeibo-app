@@ -27,3 +27,8 @@ export function formatSignedYen(amount: number): string {
   const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
   return `${sign}¥${formatter.format(Math.abs(amount))}`;
 }
+
+/** 残高の表記。マイナスは「-¥1,000」にする (formatYen だと「¥-1,000」になる) */
+export function formatBalance(amount: number): string {
+  return amount < 0 ? formatSignedYen(amount) : formatYen(amount);
+}

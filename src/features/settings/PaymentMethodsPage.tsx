@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import GripIcon from '../../components/GripIcon';
 import {
   countTransactionsUsing,
@@ -7,9 +8,10 @@ import {
   savePaymentMethod,
 } from '../../db/operations';
 import { newId } from '../../db/seed';
-import { usePaymentMethods } from '../../hooks/useData';
+import { useLookup, usePaymentMethods } from '../../hooks/useData';
 import { useDragReorder } from '../../hooks/useDragReorder';
 import type { PaymentMethod, PaymentMethodKind } from '../../types';
+import { cardsDebitedFrom, debitAccountOf } from '../../utils/balance';
 import { closingRuleLabel } from '../../utils/billing';
 
 const KIND_LABEL: Record<PaymentMethodKind, string> = {
@@ -25,26 +27,30 @@ interface FormState {
   closingDay: string;
   paymentDay: string;
   paymentMonthOffset: string;
+  /** 引き落とし口座の id。空なら設定しない */
+  debitAccountId: string;
 }
-
-const emptyForm: FormState = {
-  id: null,
-  name: '',
-  kind: 'credit_card',
-  closingDay: '31',
-  paymentDay: '27',
-  paymentMonthOffset: '1',
-};
 
 export default function PaymentMethodsPage() {
   const paymentMethods = usePaymentMethods();
+  const methodById = useLookup(paymentMethods);
   const sortable = useDragReorder(paymentMethods, reorderPaymentMethods);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState('');
 
+  const bankAccounts = paymentMethods.filter((m) => m.kind === 'bank');
+
   const openNew = () => {
     setError('');
-    setForm(emptyForm);
+    setForm({
+      id: null,
+      name: '',
+      kind: 'credit_card',
+      closingDay: '31',
+      paymentDay: '27',
+      paymentMonthOffset: '1',
+      debitAccountId: bankAccounts[0]?.id ?? '',
+    });
   };
 
   const openEdit = (method: PaymentMethod) => {
@@ -56,6 +62,8 @@ export default function PaymentMethodsPage() {
       closingDay: String(method.closingDay ?? 31),
       paymentDay: String(method.paymentDay ?? 27),
       paymentMonthOffset: String(method.paymentMonthOffset ?? 1),
+      // 引き落とし口座が消されたり銀行口座でなくなったりしていたら、未設定として開く
+      debitAccountId: debitAccountOf(method, methodById)?.id ?? '',
     });
   };
 
@@ -79,6 +87,7 @@ export default function PaymentMethodsPage() {
     }
 
     const existing = paymentMethods.find((m) => m.id === form.id);
+    const isBank = form.kind === 'bank';
     savePaymentMethod({
       id: form.id ?? newId(),
       name: form.name.trim(),
@@ -86,6 +95,10 @@ export default function PaymentMethodsPage() {
       closingDay: isCard ? closingDay : undefined,
       paymentDay: isCard ? paymentDay : undefined,
       paymentMonthOffset: isCard ? Number(form.paymentMonthOffset) : undefined,
+      debitAccountId: isCard && form.debitAccountId ? form.debitAccountId : undefined,
+      // 残高は口座残高の画面で入力する。銀行口座のままなら引き継ぐ
+      balanceDate: isBank ? existing?.balanceDate : undefined,
+      balance: isBank ? existing?.balance : undefined,
       sortOrder:
         existing?.sortOrder ??
         Math.max(0, ...paymentMethods.map((m) => m.sortOrder)) + 1,
@@ -95,12 +108,18 @@ export default function PaymentMethodsPage() {
 
   const handleDelete = async (method: PaymentMethod) => {
     const usedCount = await countTransactionsUsing('paymentMethodId', method.id);
-    const message =
+    const debitedCards = cardsDebitedFrom(method, paymentMethods);
+    const notes = [
       usedCount > 0
-        ? `「${method.name}」は${usedCount}件の取引で使われています。削除すると取引の支払い方法表示が「(削除済み)」になります。削除しますか?`
-        : `「${method.name}」を削除しますか?`;
+        ? `「${method.name}」は${usedCount}件の取引で使われています。削除すると取引の支払い方法表示が「(削除済み)」になります。`
+        : '',
+      debitedCards.length > 0
+        ? `「${method.name}」を引き落とし口座にしている${debitedCards.map((card) => `「${card.name}」`).join('')}は、引き落とし口座が未設定になります。`
+        : '',
+    ].join('');
+    const message = notes ? `${notes}削除しますか?` : `「${method.name}」を削除しますか?`;
     if (!window.confirm(message)) return;
-    deletePaymentMethod(method.id);
+    deletePaymentMethod(method.id, paymentMethods);
   };
 
   return (
@@ -178,9 +197,35 @@ export default function PaymentMethodsPage() {
                     <option value="2">締め月の翌々月</option>
                   </select>
                 </label>
+                <label className="field">
+                  引き落とし口座
+                  <select
+                    value={form.debitAccountId}
+                    onChange={(e) => setForm({ ...form, debitAccountId: e.target.value })}
+                  >
+                    {bankAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                    <option value="">設定しない</option>
+                  </select>
+                </label>
               </>
             )}
           </div>
+
+          {form.kind === 'credit_card' && (
+            <p className="muted">
+              引き落とし口座を選ぶと、支払日に請求予定額を「口座残高」の残高から引きます。
+              {bankAccounts.length === 0 && '先に種別を「銀行口座」にした支払い方法を追加すると選べます。'}
+            </p>
+          )}
+          {form.kind === 'bank' && (
+            <p className="muted">
+              残高は「<Link to="/accounts">口座残高</Link>」の画面で入力します。
+            </p>
+          )}
 
           {error && <p className="expense">{error}</p>}
 
@@ -207,6 +252,7 @@ export default function PaymentMethodsPage() {
                   <th>名称</th>
                   <th>種別</th>
                   <th>締め日 / 支払日</th>
+                  <th>引き落とし口座</th>
                   <th></th>
                 </tr>
               </thead>
@@ -237,6 +283,11 @@ export default function PaymentMethodsPage() {
                             paymentDay: method.paymentDay,
                             paymentMonthOffset: method.paymentMonthOffset ?? 1,
                           })
+                        : '—'}
+                    </td>
+                    <td className="muted">
+                      {method.kind === 'credit_card'
+                        ? (debitAccountOf(method, methodById)?.name ?? '未設定')
                         : '—'}
                     </td>
                     <td>

@@ -6,6 +6,7 @@ import { initializeUserData } from './db/operations';
 import { isCancelledPopup, reportSyncError } from './db/syncStatus';
 import LoginPage from './features/auth/LoginPage';
 import SetupRequiredPage from './features/auth/SetupRequiredPage';
+import AccountsPage from './features/accounts/AccountsPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import RecurringPage from './features/recurring/RecurringPage';
 import CalendarReportPage from './features/reports/CalendarReportPage';
@@ -53,6 +54,7 @@ function AuthGate() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/transactions/new" element={<TransactionFormPage />} />
           <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/reports/calendar" element={<CalendarReportPage />} />
           <Route path="/reports/category" element={<CategoryReportPage />} />
           <Route
