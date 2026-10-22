@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import GripIcon from '../../components/GripIcon';
 import {
   countTransactionsUsing,
   deletePaymentMethod,
+  reorderPaymentMethods,
   savePaymentMethod,
 } from '../../db/operations';
 import { newId } from '../../db/seed';
 import { usePaymentMethods } from '../../hooks/useData';
+import { useDragReorder } from '../../hooks/useDragReorder';
 import type { PaymentMethod, PaymentMethodKind } from '../../types';
 
 const KIND_LABEL: Record<PaymentMethodKind, string> = {
@@ -40,6 +43,7 @@ const OFFSET_LABEL: Record<string, string> = {
 
 export default function PaymentMethodsPage() {
   const paymentMethods = usePaymentMethods();
+  const sortable = useDragReorder(paymentMethods, reorderPaymentMethods);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState('');
 
@@ -203,15 +207,27 @@ export default function PaymentMethodsPage() {
             <table>
               <thead>
                 <tr>
+                  <th></th>
                   <th>名称</th>
                   <th>種別</th>
                   <th>締め日 / 支払日</th>
                   <th></th>
                 </tr>
               </thead>
-              <tbody>
-                {paymentMethods.map((method) => (
-                  <tr key={method.id}>
+              <tbody className={sortable.dragging ? 'sorting' : undefined}>
+                {sortable.items.map((method, index) => (
+                  <tr key={method.id} {...sortable.rowProps(method, index)}>
+                    <td className="drag-cell">
+                      <button
+                        type="button"
+                        className="drag-handle"
+                        aria-label={`「${method.name}」の並べ替え (↑↓ キーで移動)`}
+                        title="ドラッグして並べ替え"
+                        {...sortable.handleProps(method, index)}
+                      >
+                        <GripIcon />
+                      </button>
+                    </td>
                     <td>{method.name}</td>
                     <td>
                       <span className="tag">{KIND_LABEL[method.kind]}</span>

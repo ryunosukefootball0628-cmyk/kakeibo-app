@@ -18,6 +18,13 @@ export interface UpdateNote {
 
 export const UPDATE_NOTES: UpdateNote[] = [
   {
+    id: 3,
+    date: '2026-10-22',
+    items: [
+      '「支払い方法設定」でも、行の左端のつまみをドラッグして支払い方法を並べ替えられるようになりました。一番上の支払い方法が、取引を新しく入力するときに最初から選ばれます。',
+    ],
+  },
+  {
     id: 2,
     date: '2026-10-22',
     items: [

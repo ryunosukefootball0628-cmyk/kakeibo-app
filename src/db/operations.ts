@@ -110,17 +110,22 @@ export function deleteCategory(id: string): void {
 }
 
 /**
- * 並べ替えたあとのカテゴリ (同じ種別のもの) に、先頭から 1, 2, 3… の表示順を振り直し、1 回の一括書き込みで送る。
+ * 並べ替えたあとの記録に、先頭から 1, 2, 3… の表示順を振り直し、1 回の一括書き込みで送る。
  * 隣どうしの値を入れ替えるだけだと、同じ値が並んでいたときに順番が変わらないため、まとめて振り直す。
  * 他の端末での並べ替えがまだ届いていないなど、手元の sortOrder が古いこともあるため、値が同じに見える
  * ものも省かずに書く (省くと両方の並びが混ざる)。
  */
-export function reorderCategories(ordered: Category[]): void {
+function reorder(name: 'categories' | 'paymentMethods', ordered: { id: string }[]): void {
   const batch = writeBatch(firestore);
-  ordered.forEach((category, index) => {
-    batch.update(itemRef('categories', category.id), { sortOrder: index + 1 });
+  ordered.forEach((record, index) => {
+    batch.update(itemRef(name, record.id), { sortOrder: index + 1 });
   });
   inBackground(batch.commit());
+}
+
+/** ordered は同じ種別 (収入／支出) のカテゴリだけを並べたもの */
+export function reorderCategories(ordered: Category[]): void {
+  reorder('categories', ordered);
 }
 
 export function savePaymentMethod(method: PaymentMethod): void {
@@ -131,6 +136,10 @@ export function savePaymentMethod(method: PaymentMethod): void {
 
 export function deletePaymentMethod(id: string): void {
   inBackground(deleteDoc(itemRef('paymentMethods', id)));
+}
+
+export function reorderPaymentMethods(ordered: PaymentMethod[]): void {
+  reorder('paymentMethods', ordered);
 }
 
 export function saveRecurring(recurring: RecurringExpense): void {

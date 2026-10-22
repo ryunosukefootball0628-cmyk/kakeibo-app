@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import GripIcon from '../../components/GripIcon';
 import {
   countTransactionsUsing,
   deleteCategory,
@@ -203,16 +204,5 @@ function CategoryGroup({ label, items, onAdd, onEdit, onDelete }: CategoryGroupP
         </div>
       )}
     </div>
-  );
-}
-
-/** ドラッグのつまみ (縦 3 × 横 2 の点) */
-function GripIcon() {
-  return (
-    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-      {[3, 8, 13].flatMap((y) =>
-        [2.5, 7.5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" />),
-      )}
-    </svg>
   );
 }
