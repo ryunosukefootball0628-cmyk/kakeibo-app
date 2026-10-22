@@ -87,6 +87,7 @@ export default function CategoriesPage() {
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                maxLength={100}
                 required
               />
             </label>

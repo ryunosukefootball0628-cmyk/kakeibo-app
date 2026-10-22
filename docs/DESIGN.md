@@ -244,6 +244,7 @@ kakeibo-app/
 ```
 npm install
 npm run dev            # http://localhost:5173 (.env.local の Firebase につなぐ)
+npm run dev:lan        # 同じ Wi-Fi のスマホから開けるよう LAN にも公開する (共用 Wi-Fi では使わない)
 npm run emulators      # Firebase エミュレーターを起動 (Java が必要)
 npm run dev:emulator   # エミュレーターにつないで起動 (Firebase の設定は不要)
 npm run test:rules     # Firestore のルールをテスト
@@ -316,6 +317,9 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 
 - `.npmrc` の `ignore-scripts=true` で、`npm install` / `npm ci` 時に依存パッケージのインストールスクリプトを実行しない。乗っ取られたパッケージが手元の `firebase login` の認証情報や Actions のシークレットを盗むのを防ぐ。今の依存（esbuild, protobufjs, @firebase/util）のスクリプトは無くても動く
 - GitHub Actions の外部 Action はコミット SHA で固定し、デプロイ時に使う firebase-tools の版も固定する（既定は `latest`）。サービスアカウントの鍵を扱うため、タグの付け替えや新しい版の乗っ取りで中身が差し替わらないようにする
+- 手元で使う firebase-tools（`package.json` の scripts と README のコマンド）も、デプロイと同じ版に固定する。手元の CLI は `firebase login` の認証情報（全利用者のデータを読める管理者権限）を使って動くため、`@15` のような範囲指定だと、乗っ取られた新しい版が公開された直後の実行で認証情報を盗まれうる。Dependabot は scripts の中の版を更新しないので、版を上げるときは `package.json`・README・`deploy.yml` の 3 か所を手でそろえる
+- 開発サーバーは既定でこの PC からの接続だけを受け付ける（`vite.config.ts` で `server.host` を指定しない）。LAN に公開すると同じネットワークの誰からでも開け、Vite の「外部公開時に PC 内のファイルを読まれる」種類の脆弱性（2025 年に複数件）が見つかったときに上の認証情報を読まれるおそれがある。スマホで確かめるときだけ `npm run dev:lan` を使う
+- 入力欄には firestore.rules と同じ上限（名称 100 文字、メモ 1000 文字、金額 1 兆円）を付ける。書き込みはサーバーの応答を待たないため、上限を超えると保存できたように見えたあと拒否されて記録が消える
 - ワークフローの既定の権限は `permissions: {}` とし、各ジョブに必要な分だけ与える。`actions/checkout` は `persist-credentials: false` で GITHUB_TOKEN を作業ツリーに残さない
 - Dependabot（`.github/dependabot.yml`）が npm と Actions の更新を週 1 回 PR で知らせる。公開直後の版は乗っ取りに気づかれる前のことがあるので、7 日待ってから提案させる
 - `npm audit` に残る `@grpc/grpc-js` の指摘は、Node.js で動く gRPC サーバー向けの問題。ブラウザ版の Firestore は gRPC を使わず、Node.js で使うのはルールのテストだけなので、配信するアプリには影響しない（Firebase が依存の版を上げるまで残る）

@@ -123,6 +123,7 @@ export default function PaymentMethodsPage() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="〇〇カード"
+                maxLength={100}
                 required
               />
             </label>

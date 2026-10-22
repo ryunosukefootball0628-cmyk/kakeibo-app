@@ -16,7 +16,7 @@ import {
 } from '../../hooks/useData';
 import type { RecurringCycle, RecurringExpense } from '../../types';
 import { currentYearMonth, dateLabel, yearMonthLabel } from '../../utils/date';
-import { formatYen } from '../../utils/money';
+import { formatYen, MAX_AMOUNT } from '../../utils/money';
 import { pendingRecurrings } from '../../utils/recurring';
 
 interface FormState {
@@ -103,6 +103,10 @@ export default function RecurringPage() {
       setError('金額は 1 以上の数値で入力してください。');
       return;
     }
+    if (Math.round(amount) > MAX_AMOUNT) {
+      setError(`金額は ${formatYen(MAX_AMOUNT)} 以下で入力してください。`);
+      return;
+    }
     if (!form.categoryId || !form.paymentMethodId) {
       setError('カテゴリと支払い方法を選択してください。');
       return;
@@ -154,6 +158,7 @@ export default function RecurringPage() {
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                maxLength={100}
                 placeholder="Netflix"
                 required
               />
@@ -163,6 +168,7 @@ export default function RecurringPage() {
               <input
                 type="number"
                 min={1}
+                max={MAX_AMOUNT}
                 step={1}
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
@@ -243,6 +249,7 @@ export default function RecurringPage() {
               <input
                 value={form.memo}
                 onChange={(e) => setForm({ ...form, memo: e.target.value })}
+                maxLength={1000}
                 placeholder="任意"
               />
             </label>

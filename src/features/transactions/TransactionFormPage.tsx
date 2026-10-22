@@ -8,6 +8,7 @@ import {
 } from '../../hooks/useData';
 import type { TransactionType } from '../../types';
 import { todayIso } from '../../utils/date';
+import { formatYen, MAX_AMOUNT } from '../../utils/money';
 
 /** 他の画面から登録・編集を開くときに navigate の state で渡せる値 */
 export interface TransactionFormState {
@@ -68,6 +69,10 @@ export default function TransactionFormPage() {
     const parsed = Number(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       setError('金額は 1 以上の数値で入力してください。');
+      return;
+    }
+    if (Math.round(parsed) > MAX_AMOUNT) {
+      setError(`金額は ${formatYen(MAX_AMOUNT)} 以下で入力してください。`);
       return;
     }
     if (!categoryId || !paymentMethodId) {
@@ -140,6 +145,7 @@ export default function TransactionFormPage() {
               type="number"
               inputMode="numeric"
               min={1}
+              max={MAX_AMOUNT}
               step={1}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -181,6 +187,7 @@ export default function TransactionFormPage() {
             <input
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
+              maxLength={1000}
               placeholder="任意"
             />
           </label>

@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host",
     "dev:emulator": "vite --mode emulator",
-    "emulators": "npx -y firebase-tools@15 emulators:start --only auth,firestore --project demo-kakeibo",
+    "emulators": "npx -y firebase-tools@15.34.0 emulators:start --only auth,firestore --project demo-kakeibo",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:rules": "npx -y firebase-tools@15 emulators:exec --only firestore --project demo-kakeibo \"node --test tests/firestore.rules.test.mjs\""
+    "test:rules": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore --project demo-kakeibo \"node --test tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "firebase": "^12.19.0",
