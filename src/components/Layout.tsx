@@ -12,6 +12,14 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
     ],
   },
   {
+    label: 'シフト・給与',
+    items: [
+      { to: '/shifts', label: 'シフト' },
+      { to: '/salary', label: '給与' },
+      { to: '/settings/workplaces', label: '勤務先設定' },
+    ],
+  },
+  {
     label: '集計',
     items: [
       { to: '/reports/calendar', label: 'カレンダー' },

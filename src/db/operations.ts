@@ -20,8 +20,12 @@ import type {
   BackupData,
   Category,
   PaymentMethod,
+  PayRate,
   RecurringExpense,
+  Shift,
+  ShiftTemplate,
   Transaction,
+  Workplace,
 } from '../types';
 import {
   COLLECTION_NAMES,
@@ -38,7 +42,7 @@ import { assertOnline, reportSyncError } from './syncStatus';
 
 type TransactionInput = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>;
 
-/** 4 つのコレクションの中身一式 */
+/** 全コレクションの中身一式 */
 type DataSet = Omit<BackupData, 'version' | 'exportedAt'>;
 
 /**
@@ -159,12 +163,13 @@ export function deleteRecurring(id: string): void {
   inBackground(deleteDoc(itemRef('recurringExpenses', id)));
 }
 
-/** カテゴリ・支払い方法を削除する前に、それを使っている取引の件数を数える */
-export async function countTransactionsUsing(
-  field: 'categoryId' | 'paymentMethodId',
+/** 削除する前に、それを参照している記録の件数を数える */
+async function countReferences(
+  name: CollectionName,
+  field: string,
   id: string,
 ): Promise<number> {
-  const q = query(userCollection('transactions'), where(field, '==', id));
+  const q = query(userCollection(name), where(field, '==', id));
   if (navigator.onLine) {
     try {
       return (await getCountFromServer(q)).data().count;
@@ -174,6 +179,126 @@ export async function countTransactionsUsing(
   }
   // オフラインでは端末に残っている分だけで数える (実際より少ないことがある)
   return (await getDocsFromCache(q)).size;
+}
+
+/** カテゴリ・支払い方法を削除する前に、それを使っている取引の件数を数える */
+export function countTransactionsUsing(
+  field: 'categoryId' | 'paymentMethodId',
+  id: string,
+): Promise<number> {
+  return countReferences('transactions', field, id);
+}
+
+// ---------- シフト・給与 ----------
+
+/** 勤務先を新しく作る。最初の時給の設定も一緒に書き込む */
+export function addWorkplace(workplace: Workplace, rate: PayRate): void {
+  const batch = writeBatch(firestore);
+  batch.set(itemRef('workplaces', workplace.id), toDocData('workplaces', workplace));
+  batch.set(itemRef('payRates', rate.id), toDocData('payRates', rate));
+  inBackground(batch.commit());
+}
+
+export function saveWorkplace(workplace: Workplace): void {
+  inBackground(
+    setDoc(itemRef('workplaces', workplace.id), toDocData('workplaces', workplace)),
+  );
+}
+
+export function setWorkplaceActive(id: string, isActive: boolean): void {
+  inBackground(updateDoc(itemRef('workplaces', id), { isActive }));
+}
+
+export function savePayRate(rate: PayRate): void {
+  inBackground(setDoc(itemRef('payRates', rate.id), toDocData('payRates', rate)));
+}
+
+export function deletePayRate(id: string): void {
+  inBackground(deleteDoc(itemRef('payRates', id)));
+}
+
+/** 時給の履歴をすべて消し、1 つの設定に置き換える (過去のシフトにも同じ額を使う) */
+export function replacePayRates(current: PayRate[], rate: PayRate): void {
+  const batch = writeBatch(firestore);
+  for (const old of current) {
+    if (old.id !== rate.id) batch.delete(itemRef('payRates', old.id));
+  }
+  batch.set(itemRef('payRates', rate.id), toDocData('payRates', rate));
+  inBackground(batch.commit());
+}
+
+/** 勤務先を削除する前に、その勤務先のシフトの件数を数える */
+export function countShiftsOf(workplaceId: string): Promise<number> {
+  return countReferences('shifts', 'workplaceId', workplaceId);
+}
+
+/**
+ * 勤務先と、そのシフト・テンプレート・時給の設定をまとめて削除する。
+ * 記録済みの給料 (取引) は家計簿の記録なので残す。
+ * 端末のキャッシュには一部しか無いことがあるため、サーバーから読んで消す。
+ */
+export async function deleteWorkplace(id: string): Promise<void> {
+  assertOnline();
+  const related = await Promise.all(
+    (['shifts', 'shiftTemplates', 'payRates'] as const).map(async (name) => {
+      const snapshot = await getDocsFromServer(
+        query(userCollection(name), where('workplaceId', '==', id)),
+      );
+      return snapshot.docs.map((d): BatchOp => (batch) => batch.delete(d.ref));
+    }),
+  );
+  // 勤務先は最後に消す。途中で失敗しても、シフトが残ったまま勤務先だけ消えることはない
+  await commitAll([
+    ...related.flat(),
+    (batch) => batch.delete(itemRef('workplaces', id)),
+  ]);
+}
+
+export function saveShift(shift: Shift): void {
+  inBackground(setDoc(itemRef('shifts', shift.id), toDocData('shifts', shift)));
+}
+
+/** 複数の日にまとめて登録する */
+export function addShifts(shifts: Shift[]): void {
+  const batch = writeBatch(firestore);
+  for (const shift of shifts) {
+    batch.set(itemRef('shifts', shift.id), toDocData('shifts', shift));
+  }
+  inBackground(batch.commit());
+}
+
+export function deleteShift(id: string): void {
+  inBackground(deleteDoc(itemRef('shifts', id)));
+}
+
+export function saveShiftTemplate(template: ShiftTemplate): void {
+  inBackground(
+    setDoc(itemRef('shiftTemplates', template.id), toDocData('shiftTemplates', template)),
+  );
+}
+
+export function deleteShiftTemplate(id: string): void {
+  inBackground(deleteDoc(itemRef('shiftTemplates', id)));
+}
+
+export interface SalaryInput {
+  workplaceId: string;
+  /** 支給月 (YYYY-MM) */
+  payMonth: string;
+  /** 入金日 */
+  date: string;
+  /** 口座に入った額 (手取り) */
+  amount: number;
+  /** 給与明細の総支給額 */
+  grossPay?: number;
+  categoryId: string;
+  paymentMethodId: string;
+  memo?: string;
+}
+
+/** 給料を収入の取引として記録する。勤務先と支給月を残し、見込みと突き合わせられるようにする */
+export function recordSalary(input: SalaryInput): string {
+  return addTransaction({ type: 'income', ...input });
 }
 
 // ---------- 初回ログイン ----------
@@ -224,14 +349,10 @@ async function fetchAll<K extends CollectionName>(
 }
 
 async function fetchEverything(): Promise<DataSet> {
-  const [transactions, categories, paymentMethods, recurringExpenses] =
-    await Promise.all([
-      fetchAll('transactions'),
-      fetchAll('categories'),
-      fetchAll('paymentMethods'),
-      fetchAll('recurringExpenses'),
-    ]);
-  return { transactions, categories, paymentMethods, recurringExpenses };
+  const entries = await Promise.all(
+    COLLECTION_NAMES.map(async (name) => [name, await fetchAll(name)] as const),
+  );
+  return Object.fromEntries(entries) as unknown as DataSet;
 }
 
 function upsertOps(data: DataSet): BatchOp[] {
@@ -261,7 +382,7 @@ async function replaceAll(data: DataSet): Promise<void> {
 export async function exportBackup(): Promise<BackupData> {
   assertOnline();
   return {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     ...(await fetchEverything()),
   };
@@ -277,13 +398,21 @@ function assertBackup(data: unknown): asserts data is BackupData {
         record.id !== '' &&
         !record.id.includes('/'),
     );
+  // シフト・給与の記録は version 3 で加わった
+  const hasShiftData =
+    d?.version !== 3 ||
+    (isRecords(d.workplaces) &&
+      isRecords(d.payRates) &&
+      isRecords(d.shifts) &&
+      isRecords(d.shiftTemplates));
   if (
     !d ||
-    (d.version !== 1 && d.version !== 2) ||
+    (d.version !== 1 && d.version !== 2 && d.version !== 3) ||
     !isRecords(d.transactions) ||
     !isRecords(d.categories) ||
     !isRecords(d.paymentMethods) ||
-    !isRecords(d.recurringExpenses)
+    !isRecords(d.recurringExpenses) ||
+    !hasShiftData
   ) {
     throw new Error('バックアップファイルの形式が正しくありません。');
   }
@@ -291,7 +420,7 @@ function assertBackup(data: unknown): asserts data is BackupData {
 
 /** version 1 は paymentMonthOffset が「翌月 = 0」基準なので現行の基準に揃える */
 function migratePaymentMethods(data: BackupData): PaymentMethod[] {
-  if (data.version === 2) return data.paymentMethods;
+  if (data.version !== 1) return data.paymentMethods;
   return data.paymentMethods.map((method) =>
     method.kind === 'credit_card' && method.paymentMonthOffset != null
       ? { ...method, paymentMonthOffset: method.paymentMonthOffset + 1 }
@@ -304,7 +433,15 @@ export async function importBackup(json: string): Promise<void> {
   assertOnline();
   const data: unknown = JSON.parse(json);
   assertBackup(data);
-  await replaceAll({ ...data, paymentMethods: migratePaymentMethods(data) });
+  await replaceAll({
+    ...data,
+    paymentMethods: migratePaymentMethods(data),
+    // version 2 までのファイルにはシフト・給与の記録が無いので、取り込むと空になる
+    workplaces: data.workplaces ?? [],
+    payRates: data.payRates ?? [],
+    shifts: data.shifts ?? [],
+    shiftTemplates: data.shiftTemplates ?? [],
+  });
 }
 
 /** 全データを削除し、カテゴリと支払い方法を初期状態に戻す */
@@ -315,6 +452,10 @@ export async function resetAll(): Promise<void> {
     categories: SEED_CATEGORIES,
     paymentMethods: SEED_PAYMENT_METHODS,
     recurringExpenses: [],
+    workplaces: [],
+    payRates: [],
+    shifts: [],
+    shiftTemplates: [],
   });
 }
 

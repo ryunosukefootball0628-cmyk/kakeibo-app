@@ -2,6 +2,13 @@
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** URL のクエリなどから受け取った年月。正しくなければ今月 */
+export function yearMonthOrCurrent(text: string | null): string {
+  return text && YEAR_MONTH_PATTERN.test(text) ? text : currentYearMonth();
+}
+
 export function formatIsoDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

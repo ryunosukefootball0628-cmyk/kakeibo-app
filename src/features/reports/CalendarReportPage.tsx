@@ -9,19 +9,17 @@ import {
 } from '../../hooks/useData';
 import type { TransactionType } from '../../types';
 import {
-  currentYearMonth,
   dateLabel,
   datesOfMonth,
   todayIso,
   weekdayOf,
+  yearMonthOrCurrent,
 } from '../../utils/date';
 import { formatCompactAmount, formatYen } from '../../utils/money';
 import type { TransactionFormState } from '../transactions/TransactionFormPage';
 import TransactionTable from '../transactions/TransactionTable';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-
-const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 type DayTotals = Record<TransactionType, number>;
 
@@ -56,9 +54,7 @@ export default function CalendarReportPage() {
   const navigate = useNavigate();
   // 編集画面から戻ったときに同じ月・同じ日を開けるよう、表示状態は URL に持たせる
   const [searchParams, setSearchParams] = useSearchParams();
-  const monthParam = searchParams.get('month');
-  const yearMonth =
-    monthParam && YEAR_MONTH_PATTERN.test(monthParam) ? monthParam : currentYearMonth();
+  const yearMonth = yearMonthOrCurrent(searchParams.get('month'));
 
   const dates = useMemo(() => datesOfMonth(yearMonth), [yearMonth]);
   const today = todayIso();

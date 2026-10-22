@@ -16,8 +16,10 @@ import {
   useLookup,
   usePaymentMethods,
   useRecurrings,
+  useSalaryTransactions,
   useTransactionsBetween,
 } from '../../hooks/useData';
+import { usePayrolls } from '../../hooks/usePayroll';
 import {
   billingCycleForPaymentMonth,
   sumTransactionsInPeriod,
@@ -27,9 +29,11 @@ import {
   currentYearMonth,
   dateLabel,
   monthRange,
+  todayIso,
   yearMonthLabel,
 } from '../../utils/date';
 import { formatSignedYen, formatYen } from '../../utils/money';
+import { pendingPayrolls } from '../../utils/payroll';
 import { pendingRecurrings } from '../../utils/recurring';
 
 export default function DashboardPage() {
@@ -115,6 +119,13 @@ export default function DashboardPage() {
     [recurrings, monthTransactions, yearMonth],
   );
 
+  const { payrolls } = usePayrolls(yearMonth);
+  const salaryTransactions = useSalaryTransactions(yearMonth, yearMonth);
+  const pendingSalaries = useMemo(
+    () => pendingPayrolls(payrolls, salaryTransactions, todayIso()),
+    [payrolls, salaryTransactions],
+  );
+
   return (
     <>
       <div className="spread" style={{ marginBottom: '0.5rem' }}>
@@ -144,6 +155,36 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {pendingSalaries.length > 0 && (
+        <div className="card">
+          <h2>未記録の給料（{yearMonthLabel(yearMonth)}）</h2>
+          <p className="muted">
+            給料日を過ぎた給料です。振り込まれた額を確認して記録してください。
+          </p>
+          <div className="table-wrap">
+            <table>
+              <tbody>
+                {pendingSalaries.map(({ workplace, cycle, summary }) => (
+                  <tr key={workplace.id}>
+                    <td>{dateLabel(cycle.paymentDate)}</td>
+                    <td>
+                      <span className="swatch" style={{ background: workplace.color }} />
+                      {workplace.name}
+                    </td>
+                    <td className="amount">見込み {formatYen(summary.total)}</td>
+                    <td>
+                      <Link to={`/salary?month=${yearMonth}&record=${workplace.id}`}>
+                        <button className="small primary">確認して記録</button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div className="card">

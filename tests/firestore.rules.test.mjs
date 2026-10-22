@@ -134,6 +134,109 @@ describe('取引の形式', () => {
   test('長すぎる ID は拒否される', async () => {
     await assertFails(setDoc(txRef(alice(), 'alice', 'x'.repeat(65)), transaction));
   });
+
+  test('給料として記録した取引 (勤務先・支給月・総支給額付き)', async () => {
+    const salary = {
+      ...transaction,
+      type: 'income',
+      categoryId: 'cat-salary',
+      paymentMethodId: 'pm-bank',
+      amount: 85000,
+      workplaceId: 'w1',
+      payMonth: '2026-11',
+      grossPay: 88000,
+    };
+    await assertSucceeds(setDoc(txRef(alice()), salary));
+    await assertSucceeds(
+      getDocs(query(collection(alice(), 'users', 'alice', 'transactions'), where('payMonth', '>=', '2026-01'))),
+    );
+    await assertFails(setDoc(txRef(alice()), { ...salary, payMonth: '2026-11-25' }));
+    await assertFails(setDoc(txRef(alice()), { ...salary, payMonth: '2026-13' }));
+    await assertFails(setDoc(txRef(alice()), { ...salary, grossPay: -1 }));
+    await assertFails(setDoc(txRef(alice()), { ...salary, grossPay: 100.5 }));
+    await assertFails(setDoc(txRef(alice()), { ...salary, workplaceId: 'x'.repeat(65) }));
+  });
+});
+
+describe('シフト・給与の形式', () => {
+  const ref = (name, id) => doc(alice(), 'users', 'alice', name, id);
+
+  const workplace = {
+    name: 'カフェ',
+    color: '#1d7cd6',
+    closingDay: 31,
+    paymentDay: 25,
+    paymentMonthOffset: 1,
+    nightPremiumPercent: 25,
+    overtimePremiumPercent: 25,
+    isActive: true,
+    sortOrder: 1,
+  };
+
+  const payRate = {
+    workplaceId: 'w1',
+    startDate: '2026-10-01',
+    hourlyWage: 1200,
+    transportFee: 300,
+  };
+
+  const shift = {
+    workplaceId: 'w1',
+    date: '2026-10-22',
+    startTime: '18:00',
+    endTime: '02:00',
+    breakMinutes: 60,
+  };
+
+  test('勤務先', async () => {
+    await assertSucceeds(setDoc(ref('workplaces', 'w1'), workplace));
+    await assertSucceeds(updateDoc(ref('workplaces', 'w1'), { isActive: false }));
+    await assertFails(setDoc(ref('workplaces', 'w1'), { ...workplace, paymentMonthOffset: 3 }));
+    await assertFails(setDoc(ref('workplaces', 'w1'), { ...workplace, nightPremiumPercent: 101 }));
+    await assertFails(setDoc(ref('workplaces', 'w1'), { ...workplace, closingDay: 0 }));
+    await assertFails(setDoc(ref('workplaces', 'w1'), { ...workplace, sortOrder: Infinity }));
+    const { isActive: _isActive, ...withoutActive } = workplace;
+    await assertFails(setDoc(ref('workplaces', 'w1'), withoutActive));
+  });
+
+  test('時給・交通費', async () => {
+    await assertSucceeds(setDoc(ref('payRates', 'r1'), payRate));
+    await assertSucceeds(
+      setDoc(ref('payRates', 'r1'), { ...payRate, saturdayWage: 1300, sundayWage: 1300, holidayWage: 1400 }),
+    );
+    await assertFails(setDoc(ref('payRates', 'r1'), { ...payRate, hourlyWage: 1200.5 }));
+    await assertFails(setDoc(ref('payRates', 'r1'), { ...payRate, holidayWage: '1400' }));
+    await assertFails(setDoc(ref('payRates', 'r1'), { ...payRate, startDate: '2026/10/01' }));
+    await assertFails(setDoc(ref('payRates', 'r1'), { ...payRate, nightWage: 1500 }));
+  });
+
+  test('シフト (日をまたぐもの・メモ付き)', async () => {
+    await assertSucceeds(setDoc(ref('shifts', 's1'), shift));
+    await assertSucceeds(setDoc(ref('shifts', 's1'), { ...shift, memo: 'ヘルプ' }));
+    await assertSucceeds(
+      getDocs(query(collection(alice(), 'users', 'alice', 'shifts'), where('workplaceId', '==', 'w1'))),
+    );
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, date: '2026-13-01' }));
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, startTime: '24:00' }));
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, endTime: '9:00' }));
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, breakMinutes: -10 }));
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, breakMinutes: 1440 }));
+    await assertFails(setDoc(ref('shifts', 's1'), { ...shift, memo: 'あ'.repeat(1001) }));
+  });
+
+  test('シフトのテンプレート', async () => {
+    const template = { workplaceId: 'w1', name: '早番', startTime: '09:00', endTime: '17:00', breakMinutes: 60 };
+    await assertSucceeds(setDoc(ref('shiftTemplates', 't1'), template));
+    await assertFails(setDoc(ref('shiftTemplates', 't1'), { ...template, name: '' }));
+    await assertFails(setDoc(ref('shiftTemplates', 't1'), { ...template, name: 'あ'.repeat(51) }));
+  });
+
+  test('他人のシフトは読めず、書き込めない', async () => {
+    await setDoc(ref('shifts', 's1'), shift);
+    await assertFails(getDoc(doc(bob(), 'users', 'alice', 'shifts', 's1')));
+    await assertFails(setDoc(doc(bob(), 'users', 'alice', 'workplaces', 'w2'), workplace));
+    await assertFails(deleteDoc(doc(bob(), 'users', 'alice', 'shifts', 's1')));
+  });
 });
 
 describe('マスタ・定期支出・プロフィールの形式', () => {

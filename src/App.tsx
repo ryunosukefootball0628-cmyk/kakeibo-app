@@ -11,9 +11,12 @@ import RecurringPage from './features/recurring/RecurringPage';
 import CalendarReportPage from './features/reports/CalendarReportPage';
 import CategoryReportPage from './features/reports/CategoryReportPage';
 import PaymentMethodReportPage from './features/reports/PaymentMethodReportPage';
+import SalaryPage from './features/salary/SalaryPage';
 import CategoriesPage from './features/settings/CategoriesPage';
 import DataPage from './features/settings/DataPage';
 import PaymentMethodsPage from './features/settings/PaymentMethodsPage';
+import WorkplacesPage from './features/settings/WorkplacesPage';
+import ShiftCalendarPage from './features/shifts/ShiftCalendarPage';
 import TransactionFormPage from './features/transactions/TransactionFormPage';
 import TransactionsPage from './features/transactions/TransactionsPage';
 import { isFirebaseConfigured } from './firebase';
@@ -57,6 +60,9 @@ function AuthGate() {
             element={<PaymentMethodReportPage />}
           />
           <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/shifts" element={<ShiftCalendarPage />} />
+          <Route path="/salary" element={<SalaryPage />} />
+          <Route path="/settings/workplaces" element={<WorkplacesPage />} />
           <Route path="/settings/categories" element={<CategoriesPage />} />
           <Route
             path="/settings/payment-methods"

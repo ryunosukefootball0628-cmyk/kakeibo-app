@@ -16,6 +16,12 @@ export interface Transaction {
   memo?: string;
   /** 定期支出から記録された場合の参照元 */
   recurringSourceId?: string;
+  /** 給料として記録した場合の勤務先 */
+  workplaceId?: string;
+  /** 給料として記録した場合の支給月 (YYYY-MM)。見込みとの突き合わせに使う */
+  payMonth?: string;
+  /** 給与明細の総支給額 (amount は口座に入った手取り額) */
+  grossPay?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,12 +62,85 @@ export interface RecurringExpense {
   memo?: string;
 }
 
+/** 勤務先 (アルバイト先など) */
+export interface Workplace {
+  id: string;
+  name: string;
+  /** カレンダーで見分けるための色 */
+  color: string;
+  /** 締め日 (1-31)。月末締めは 31 を指定 */
+  closingDay: number;
+  /** 給料日 (1-31)。月末払いは 31 を指定 */
+  paymentDay: number;
+  /** 締め月から給料日の月までの差。0 = 当月払い, 1 = 翌月払い, 2 = 翌々月払い */
+  paymentMonthOffset: number;
+  /** 深夜 (22時〜翌5時) の割増率 (%)。0 なら割増しない */
+  nightPremiumPercent: number;
+  /** 1日 8 時間を超えた分の割増率 (%)。0 なら割増しない */
+  overtimePremiumPercent: number;
+  /** false = 辞めたなどで、シフトの入力先に出さない */
+  isActive: boolean;
+  sortOrder: number;
+}
+
+/**
+ * 勤務先の時給と交通費。変わるたびに適用開始日を付けて追加し、過去のシフトは当時の額で計算する。
+ * 最も古い設定は、適用開始日より前のシフトにも使う。
+ */
+export interface PayRate {
+  id: string;
+  workplaceId: string;
+  /** この日以降のシフトに適用する (YYYY-MM-DD) */
+  startDate: string;
+  /** 基本の時給 (円) */
+  hourlyWage: number;
+  /** 土曜の時給。未設定なら基本の時給 */
+  saturdayWage?: number;
+  /** 日曜の時給。未設定なら基本の時給 */
+  sundayWage?: number;
+  /** 祝日の時給。未設定なら曜日の時給 */
+  holidayWage?: number;
+  /** 出勤 1 日あたりの交通費 (円) */
+  transportFee: number;
+}
+
+export interface Shift {
+  id: string;
+  workplaceId: string;
+  /** 勤務を始める日 (YYYY-MM-DD)。日をまたぐシフトもこの日の分として扱う */
+  date: string;
+  /** HH:MM */
+  startTime: string;
+  /** HH:MM。開始より前 (または同じ) なら翌日の時刻 */
+  endTime: string;
+  /** 休憩 (分) */
+  breakMinutes: number;
+  memo?: string;
+}
+
+/** よく使うシフトの時間帯 (「早番」など) */
+export interface ShiftTemplate {
+  id: string;
+  workplaceId: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+}
+
 export interface BackupData {
-  /** 1 = paymentMonthOffset が「翌月 = 0」基準の旧形式, 2 = 「当月 = 0」基準 */
-  version: 1 | 2;
+  /**
+   * 1 = paymentMonthOffset が「翌月 = 0」基準の旧形式, 2 = 「当月 = 0」基準,
+   * 3 = シフト・給与 (workplaces など) を追加
+   */
+  version: 1 | 2 | 3;
   exportedAt: string;
   transactions: Transaction[];
   categories: Category[];
   paymentMethods: PaymentMethod[];
   recurringExpenses: RecurringExpense[];
+  workplaces: Workplace[];
+  payRates: PayRate[];
+  shifts: Shift[];
+  shiftTemplates: ShiftTemplate[];
 }

@@ -12,10 +12,15 @@ import { reportSyncError } from '../db/syncStatus';
 import type {
   Category,
   PaymentMethod,
+  PayRate,
   RecurringExpense,
+  Shift,
+  ShiftTemplate,
   Transaction,
+  Workplace,
 } from '../types';
 import { monthRange } from '../utils/date';
+import { compareShifts } from '../utils/shift';
 
 /**
  * クエリの結果を購読し、変更 (他の端末からの更新を含む) のたびに再描画する。
@@ -107,6 +112,59 @@ export function useTransaction(id: string | undefined) {
   return item;
 }
 
-export function useLookup<T extends Category | PaymentMethod>(items: T[]) {
+export function useLookup<T extends Category | PaymentMethod | Workplace>(items: T[]) {
   return useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+}
+
+// ---------- シフト・給与 ----------
+
+export function useWorkplaces() {
+  return useLiveQuery<Workplace>(
+    (uid) => query(userCollection('workplaces', uid), orderBy('sortOrder')),
+    [],
+  );
+}
+
+/** 時給の設定は勤務先ごとに数件なので、すべて読む */
+export function usePayRates() {
+  return useLiveQuery<PayRate>((uid) => userCollection('payRates', uid), []);
+}
+
+export function useShiftTemplates() {
+  return useLiveQuery<ShiftTemplate>(
+    (uid) => userCollection('shiftTemplates', uid),
+    [],
+    (items) => items.sort((a, b) => a.startTime.localeCompare(b.startTime)),
+  );
+}
+
+/** 日付・開始時刻の順に取得する (start, end は両端を含む) */
+export function useShiftsBetween(start: string, end: string) {
+  return useLiveQuery<Shift>(
+    (uid) =>
+      query(
+        userCollection('shifts', uid),
+        where('date', '>=', start),
+        where('date', '<=', end),
+      ),
+    [start, end],
+    (items) => items.sort(compareShifts),
+  );
+}
+
+/**
+ * 給料として記録した取引 (支給月が from〜to のもの)。
+ * payMonth を持たない普通の取引はこの条件に当てはまらないので含まれない。
+ */
+export function useSalaryTransactions(fromMonth: string, toMonth: string) {
+  return useLiveQuery<Transaction>(
+    (uid) =>
+      query(
+        userCollection('transactions', uid),
+        where('payMonth', '>=', fromMonth),
+        where('payMonth', '<=', toMonth),
+      ),
+    [fromMonth, toMonth],
+    (items) => items.sort((a, b) => b.date.localeCompare(a.date)),
+  );
 }

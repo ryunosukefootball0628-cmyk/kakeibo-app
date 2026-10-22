@@ -8,8 +8,12 @@ import { auth, firestore } from '../firebase';
 import type {
   Category,
   PaymentMethod,
+  PayRate,
   RecurringExpense,
+  Shift,
+  ShiftTemplate,
   Transaction,
+  Workplace,
 } from '../types';
 
 /**
@@ -19,6 +23,10 @@ import type {
  *   users/{uid}/categories/{id}       … カテゴリ
  *   users/{uid}/paymentMethods/{id}   … 支払い方法
  *   users/{uid}/recurringExpenses/{id}… 定期支出
+ *   users/{uid}/workplaces/{id}       … 勤務先
+ *   users/{uid}/payRates/{id}         … 勤務先の時給・交通費 (適用開始日ごと)
+ *   users/{uid}/shifts/{id}           … シフト
+ *   users/{uid}/shiftTemplates/{id}   … シフトのテンプレート
  * 本人以外が読み書きできないことは firestore.rules で保証する。
  */
 export interface CollectionTypes {
@@ -26,6 +34,10 @@ export interface CollectionTypes {
   categories: Category;
   paymentMethods: PaymentMethod;
   recurringExpenses: RecurringExpense;
+  workplaces: Workplace;
+  payRates: PayRate;
+  shifts: Shift;
+  shiftTemplates: ShiftTemplate;
 }
 
 export type CollectionName = keyof CollectionTypes;
@@ -35,6 +47,10 @@ export const COLLECTION_NAMES: CollectionName[] = [
   'categories',
   'paymentMethods',
   'recurringExpenses',
+  'workplaces',
+  'payRates',
+  'shifts',
+  'shiftTemplates',
 ];
 
 /**
@@ -50,6 +66,9 @@ const FIELDS: { [K in CollectionName]: Exclude<keyof CollectionTypes[K], 'id'>[]
     'paymentMethodId',
     'memo',
     'recurringSourceId',
+    'workplaceId',
+    'payMonth',
+    'grossPay',
     'createdAt',
     'updatedAt',
   ],
@@ -73,6 +92,28 @@ const FIELDS: { [K in CollectionName]: Exclude<keyof CollectionTypes[K], 'id'>[]
     'isActive',
     'memo',
   ],
+  workplaces: [
+    'name',
+    'color',
+    'closingDay',
+    'paymentDay',
+    'paymentMonthOffset',
+    'nightPremiumPercent',
+    'overtimePremiumPercent',
+    'isActive',
+    'sortOrder',
+  ],
+  payRates: [
+    'workplaceId',
+    'startDate',
+    'hourlyWage',
+    'saturdayWage',
+    'sundayWage',
+    'holidayWage',
+    'transportFee',
+  ],
+  shifts: ['workplaceId', 'date', 'startTime', 'endTime', 'breakMinutes', 'memo'],
+  shiftTemplates: ['workplaceId', 'name', 'startTime', 'endTime', 'breakMinutes'],
 };
 
 export function currentUid(): string {
