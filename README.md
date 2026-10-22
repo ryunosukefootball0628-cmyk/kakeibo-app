@@ -65,6 +65,12 @@ npm install
 npm run dev
 ```
 
+開発サーバーはこの PC からの接続だけを受け付けます。同じ Wi-Fi のスマホで画面を確かめるときだけ、次のコマンドで LAN にも公開してください（カフェや学校などの共用 Wi-Fi では使わないでください。同じネットワークの誰からでも開発サーバーを開けるようになります）。なお LAN のアドレスはログインの承認済みドメインに無いため、スマホからはログインできません。
+
+```bash
+npm run dev:lan
+```
+
 ### エミュレーターで試す
 
 Firebase のプロジェクトを作らなくても、ローカルのエミュレーターで動かせます。Java 11 以上が必要です。ログイン画面では、実在しない仮のアカウントを作って入れます（「Add new account」→「Auto-generate user information」→「Sign in with Google.com」）。この PC のブラウザで `http://localhost:5173` を開いてください（スマホからはデータベースのエミュレーターにつながりません）。
@@ -97,16 +103,16 @@ npm run test:rules
    3. [Google Cloud コンソールの「認証情報」](https://console.cloud.google.com/apis/credentials)で「Web client (auto created by Google Service)」を開き、「承認済みのリダイレクト URI」に `https://<サイト名>.web.app/__/auth/handler` を追加して保存する
    4. [firebase.json](firebase.json) の 1 つ目の `site` をサイト名に書き換える。2 つ目（`kakeibo-app-ea14f`）は以前のアドレスからの転送用なので、自分のプロジェクトで動かす場合は削除する
 
-2. Firebase CLI にログインする
+2. Firebase CLI にログインする。CLI はこの PC に管理者としてのログイン情報を保存し、それを使って動くため、版を固定して実行する（[package.json](package.json) の scripts と `.github/workflows/deploy.yml` の `firebaseToolsVersion` も同じ版。版を上げるときは 3 か所をそろえる）
 
    ```bash
-   npx firebase-tools login
+   npx -y firebase-tools@15.34.0 login
    ```
 
 3. GitHub Actions からデプロイするためのサービスアカウントを作り、リポジトリの Secrets に登録する。途中で GitHub へのログインを求められます。「build script を実行するか」「PR のマージで自動デプロイするか」はどちらも `N` で構いません（このリポジトリのワークフローを使うため）。最後に作られる `.github/workflows/firebase-hosting-*.yml` は削除してください
 
    ```bash
-   npx firebase-tools init hosting:github
+   npx -y firebase-tools@15.34.0 init hosting:github
    ```
 
    登録される Secret の名前は `FIREBASE_SERVICE_ACCOUNT_<プロジェクト ID>` です。別のプロジェクトで動かす場合は `.github/workflows/deploy.yml` の Secret 名も合わせてください
@@ -123,7 +129,7 @@ npm run test:rules
 データベースのルール（[firestore.rules](firestore.rules)）は自動では反映されません。変更したら次のコマンドで反映します。
 
 ```bash
-npx firebase-tools deploy --only firestore:rules
+npx -y firebase-tools@15.34.0 deploy --only firestore:rules
 ```
 
 GitHub Pages（以前の配信先）には、移転案内のページ（[moved/index.html](moved/index.html)）を公開しています。

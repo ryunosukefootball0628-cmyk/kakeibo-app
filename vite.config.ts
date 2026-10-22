@@ -62,8 +62,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), contentSecurityPolicy(env.VITE_FIREBASE_AUTH_DOMAIN)],
     server: {
-      // 同じ Wi-Fi のスマホから開けるよう、LAN のアドレスでも待ち受ける
-      host: true,
+      // 既定ではこの PC からの接続だけを受け付ける。開発サーバーは同じネットワークの誰からでも
+      // 開けてしまい、Vite の脆弱性が見つかると PC 内のファイル (firebase login の認証情報など)
+      // を読まれるおそれがあるため。同じ Wi-Fi のスマホで確かめるときだけ npm run dev:lan を使う
       port: 5173,
       proxy: env.VITE_FIREBASE_EMULATORS === 'true' ? authEmulatorProxy : undefined,
     },

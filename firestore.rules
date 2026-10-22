@@ -40,6 +40,17 @@ service cloud.firestore {
       return isIntIn(value, 0, 1000000000000);
     }
 
+    // 日付は YYYY-MM-DD (月は 01〜12、日は 01〜31)。ありえない値で画面の集計が崩れないようにする
+    function isDate(value) {
+      return value is string
+        && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])');
+    }
+
+    // 表示順。NaN や Infinity、極端な値で並び替えが壊れないよう範囲を決める
+    function isSortOrder(value) {
+      return value is number && value >= -1000000 && value <= 1000000;
+    }
+
     function isProfile(data) {
       return data.keys().hasOnly(['createdAt']) && isText(data.createdAt, 40);
     }
@@ -48,7 +59,7 @@ service cloud.firestore {
       return data.keys().hasAll(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'createdAt', 'updatedAt'])
         && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'createdAt', 'updatedAt'])
         && data.type in ['income', 'expense']
-        && data.date is string && data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && isDate(data.date)
         && isAmount(data.amount)
         && isText(data.categoryId, 64)
         && isText(data.paymentMethodId, 64)
@@ -64,7 +75,7 @@ service cloud.firestore {
         && isText(data.name, 100)
         && data.type in ['income', 'expense']
         && isText(data.color, 32)
-        && data.sortOrder is number;
+        && isSortOrder(data.sortOrder);
     }
 
     function isPaymentMethod(data) {
@@ -75,7 +86,7 @@ service cloud.firestore {
         && isOptionalIntIn(data, 'closingDay', 1, 31)
         && isOptionalIntIn(data, 'paymentDay', 1, 31)
         && isOptionalIntIn(data, 'paymentMonthOffset', 0, 12)
-        && data.sortOrder is number;
+        && isSortOrder(data.sortOrder);
     }
 
     function isRecurringExpense(data) {

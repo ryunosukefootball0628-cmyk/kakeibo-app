@@ -185,3 +185,40 @@ describe('マスタ・定期支出・プロフィールの形式', () => {
     await assertFails(setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z', admin: true }));
   });
 });
+
+describe('入力欄の上限・ありえない値', () => {
+  // 入力欄の maxLength は文字数で数えるので、日本語でも上限ちょうどなら保存できることを確かめる
+  test('上限ちょうどの日本語のメモ・名称と金額は保存できる', async () => {
+    await assertSucceeds(
+      setDoc(txRef(alice()), { ...transaction, memo: 'あ'.repeat(1000), amount: 1000000000000 }),
+    );
+    await assertSucceeds(
+      setDoc(doc(alice(), 'users', 'alice', 'categories', 'c1'), {
+        name: 'あ'.repeat(100),
+        type: 'expense',
+        color: '#e8743b',
+        sortOrder: 1,
+      }),
+    );
+  });
+
+  for (const [label, data] of [
+    ['13 月の日付', { ...transaction, date: '2026-13-01' }],
+    ['32 日の日付', { ...transaction, date: '2026-10-32' }],
+    ['0 日の日付', { ...transaction, date: '2026-10-00' }],
+    ['1 兆円を超える金額', { ...transaction, amount: 1000000000001 }],
+  ]) {
+    test(`${label}は拒否される`, async () => {
+      await assertFails(setDoc(txRef(alice()), data));
+    });
+  }
+
+  test('表示順は NaN・Infinity・極端な値を拒否する', async () => {
+    const ref = doc(alice(), 'users', 'alice', 'categories', 'c1');
+    const category = { name: '食費', type: 'expense', color: '#e8743b', sortOrder: 1 };
+    await assertSucceeds(setDoc(ref, { ...category, sortOrder: 1.5 }));
+    for (const sortOrder of [NaN, Infinity, -Infinity, 1000001]) {
+      await assertFails(setDoc(ref, { ...category, sortOrder }));
+    }
+  });
+});

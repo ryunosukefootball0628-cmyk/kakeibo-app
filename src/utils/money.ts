@@ -1,5 +1,8 @@
 const formatter = new Intl.NumberFormat('ja-JP');
 
+/** 保存できる金額の上限 (firestore.rules の isAmount と同じ)。超えるとサーバーで拒否される */
+export const MAX_AMOUNT = 1_000_000_000_000;
+
 export function formatYen(amount: number): string {
   return `¥${formatter.format(amount)}`;
 }
