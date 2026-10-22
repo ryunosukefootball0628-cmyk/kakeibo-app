@@ -319,7 +319,7 @@ Firebase Hosting で静的ホスティングする。`main` への push をト�
 - GitHub Actions の外部 Action はコミット SHA で固定し、デプロイ時に使う firebase-tools の版も固定する（既定は `latest`）。サービスアカウントの鍵を扱うため、タグの付け替えや新しい版の乗っ取りで中身が差し替わらないようにする
 - ワークフローの既定の権限は `permissions: {}` とし、各ジョブに必要な分だけ与える。`actions/checkout` は `persist-credentials: false` で GITHUB_TOKEN を作業ツリーに残さない
 - Dependabot（`.github/dependabot.yml`）が npm と Actions の更新を週 1 回 PR で知らせる。公開直後の版は乗っ取りに気づかれる前のことがあるので、7 日待ってから提案させる
-- `npm audit` に残る `@grpc/grpc-js` の指摘は、Node.js で動く gRPC サーバー向けの問題。ブラウザ版の Firestore は gRPC を使わず、Node.js で使うのはルールのテストだけなので、配信するアプリには影響しない（Firebase が依存の版を上げるまで残る）
+- `@grpc/grpc-js` は `package.json` の `overrides` で修正済みの 1.13 系に上げている。Firebase（`@firebase/firestore`）は最新版でも `~1.9.0` に固定していて、1.9 系には GHSA-m9gg-hp2v-232j・GHSA-f596-whhp-79r4（どちらも Node.js で動く gRPC サーバー向けの問題）の修正が出ていないため。ブラウザ版の Firestore は gRPC を使わず（指定の前後でビルド結果は同じ）、Node.js で使うのはルールのテストだけなので、配信するアプリには元から影響しない。Firebase が修正済みの版を使うようになったら `overrides` を外す
 
 無料枠を使い切る悪用への備え:
 
