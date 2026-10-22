@@ -19,7 +19,6 @@ export interface UpdateNote {
 export const UPDATE_NOTES: UpdateNote[] = [
   {
     id: 4,
-    // main に入れる日に合わせて直す
     date: '2026-10-22',
     items: [
       'メニューに「シフト・給与」を追加しました。「勤務先設定」でアルバイト先と時給を登録すると、「シフト」のカレンダーでシフトを記録できます（テンプレートや、複数の日へのまとめて登録もできます）。',
