@@ -74,11 +74,18 @@ a {
   min-height: 100vh;
 }
 
+/* 長い画面をスクロールしてもメニューが残るよう、画面の上端に固定する。
+   項目が画面の高さに収まらないときは、メニューの中だけをスクロールする */
 .sidebar {
   flex: 0 0 210px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 1.25rem 0.75rem;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-title {
@@ -128,6 +135,11 @@ a {
   font-weight: 600;
 }
 
+/* メニューはスクロールする範囲の端で枠線が切れるため、キーボードで選んだ項目の枠線は内側に描く */
+.nav a:focus-visible {
+  outline-offset: -2px;
+}
+
 .main {
   flex: 1 1 auto;
   min-width: 0;
@@ -136,15 +148,30 @@ a {
 }
 
 @media (max-width: 760px) {
+  /* 上部に固定したバー (高さ約 65px) の下に、フォーカスした入力欄などが隠れないようにする */
+  html {
+    scroll-padding-top: 4.5rem;
+  }
+
   .app {
     flex-direction: column;
   }
 
+  /* 画面上部のバーとして固定し、スクロールした中身はバーの下をくぐらせる。
+     開いたメニューが画面に収まらないときは、閉じるボタンを残してメニューだけをスクロールする
+     (dvh は、アドレスバーの出し入れに合わせて変わる、いま見えている画面の高さ) */
   .sidebar {
     flex: none;
     border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 0.75rem;
+    z-index: 10;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: 100dvh;
+    overflow-y: visible;
   }
 
   .sidebar-header {
@@ -162,10 +189,14 @@ a {
     display: block;
   }
 
-  /* 閉じているあいだは隠し、開いたら PC と同じく縦に並べる */
+  /* 閉じているあいだは隠し、開いたら PC と同じく縦に並べる。
+     メニューの端までスクロールしても、裏の画面まではスクロールしない */
   .nav {
     display: none;
     margin-top: 0.5rem;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .sidebar.open .nav {

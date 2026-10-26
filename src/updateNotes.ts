@@ -18,6 +18,13 @@ export interface UpdateNote {
 
 export const UPDATE_NOTES: UpdateNote[] = [
   {
+    id: 7,
+    date: '2026-10-26',
+    items: [
+      '画面を下へスクロールしても、メニューが隠れずに表示されたままになりました。スマホでは「☰ メニュー」ボタンのあるバーが画面の上に固定されるので、長い一覧の途中からでもすぐに別の画面へ移れます。',
+    ],
+  },
+  {
     id: 6,
     date: '2026-10-26',
     items: [
