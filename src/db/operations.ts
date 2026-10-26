@@ -1,4 +1,6 @@
 import {
+  arrayRemove,
+  arrayUnion,
   deleteField,
   deleteDoc,
   getCountFromServer,
@@ -16,6 +18,7 @@ import {
 import { deleteUser } from 'firebase/auth';
 import { isRecentlySignedIn } from '../auth/session';
 import { auth, firestore } from '../firebase';
+import type { FeatureId } from '../optionalFeatures';
 import type {
   BackupData,
   Category,
@@ -310,6 +313,21 @@ export interface SalaryInput {
 /** 給料を収入の取引として記録する。勤務先と支給月を残し、見込みと突き合わせられるようにする */
 export function recordSalary(input: SalaryInput): string {
   return addTransaction({ type: 'income', ...input });
+}
+
+// ---------- 使う機能 ----------
+
+/**
+ * 機能のオン・オフを切り替える。オフにした機能の一覧に足し引きする形で書き、
+ * 別の端末で同時に別の機能を切り替えても、互いの変更を消さないようにする。
+ * プロフィールは初回ログイン時に作られる (無いと書き込みは失敗する)
+ */
+export function setFeatureEnabled(id: FeatureId, enabled: boolean): void {
+  inBackground(
+    updateDoc(profileRef(), {
+      disabledFeatures: enabled ? arrayRemove(id) : arrayUnion(id),
+    }),
+  );
 }
 
 // ---------- 初回ログイン ----------

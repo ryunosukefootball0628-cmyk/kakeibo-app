@@ -60,9 +60,9 @@ function useLiveResult<T>(
   return { items: result?.items ?? NONE, loading: result?.key !== key };
 }
 
-/** 最初の結果が届くまでは空配列を返す */
+/** 最初の結果が届くまでは空配列を返す。makeQuery が null なら読まない */
 function useLiveQuery<T>(
-  makeQuery: (uid: string) => Query,
+  makeQuery: ((uid: string) => Query) | null,
   deps: DependencyList,
   transform?: (items: T[]) => T[],
 ): T[] {
@@ -88,9 +88,10 @@ export function usePaymentMethodsResult() {
   );
 }
 
-export function useRecurrings() {
+/** enabled が false (定期支出を使わない設定) なら読まない */
+export function useRecurrings(enabled = true) {
   return useLiveQuery<RecurringExpense>(
-    (uid) => userCollection('recurringExpenses', uid),
+    enabled ? (uid) => userCollection('recurringExpenses', uid) : null,
     [],
     (items) => items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
   );
@@ -149,17 +150,21 @@ export function useLookup<T extends Category | PaymentMethod | Workplace>(items:
 }
 
 // ---------- シフト・給与 ----------
+// enabled を受け取るものは、false (シフト・給与を使わない設定) なら読まない
 
-export function useWorkplaces() {
+export function useWorkplaces(enabled = true) {
   return useLiveQuery<Workplace>(
-    (uid) => query(userCollection('workplaces', uid), orderBy('sortOrder')),
+    enabled ? (uid) => query(userCollection('workplaces', uid), orderBy('sortOrder')) : null,
     [],
   );
 }
 
 /** 時給の設定は勤務先ごとに数件なので、すべて読む */
-export function usePayRates() {
-  return useLiveQuery<PayRate>((uid) => userCollection('payRates', uid), []);
+export function usePayRates(enabled = true) {
+  return useLiveQuery<PayRate>(
+    enabled ? (uid) => userCollection('payRates', uid) : null,
+    [],
+  );
 }
 
 export function useShiftTemplates() {
@@ -171,14 +176,16 @@ export function useShiftTemplates() {
 }
 
 /** 日付・開始時刻の順に取得する (start, end は両端を含む) */
-export function useShiftsBetween(start: string, end: string) {
+export function useShiftsBetween(start: string, end: string, enabled = true) {
   return useLiveQuery<Shift>(
-    (uid) =>
-      query(
-        userCollection('shifts', uid),
-        where('date', '>=', start),
-        where('date', '<=', end),
-      ),
+    enabled
+      ? (uid) =>
+          query(
+            userCollection('shifts', uid),
+            where('date', '>=', start),
+            where('date', '<=', end),
+          )
+      : null,
     [start, end],
     (items) => items.sort(compareShifts),
   );
@@ -188,14 +195,16 @@ export function useShiftsBetween(start: string, end: string) {
  * 給料として記録した取引 (支給月が from〜to のもの)。
  * payMonth を持たない普通の取引はこの条件に当てはまらないので含まれない。
  */
-export function useSalaryTransactions(fromMonth: string, toMonth: string) {
+export function useSalaryTransactions(fromMonth: string, toMonth: string, enabled = true) {
   return useLiveQuery<Transaction>(
-    (uid) =>
-      query(
-        userCollection('transactions', uid),
-        where('payMonth', '>=', fromMonth),
-        where('payMonth', '<=', toMonth),
-      ),
+    enabled
+      ? (uid) =>
+          query(
+            userCollection('transactions', uid),
+            where('payMonth', '>=', fromMonth),
+            where('payMonth', '<=', toMonth),
+          )
+      : null,
     [fromMonth, toMonth],
     (items) => items.sort((a, b) => b.date.localeCompare(a.date)),
   );

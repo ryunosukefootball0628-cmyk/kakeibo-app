@@ -772,7 +772,8 @@ tbody.sorting tr.dragging {
   margin-top: 0.6rem;
 }
 
-.choice input[type='radio'] {
+.choice input[type='radio'],
+.choice input[type='checkbox'] {
   width: auto;
   margin-top: 0.3rem;
 }

@@ -18,6 +18,13 @@ export interface UpdateNote {
 
 export const UPDATE_NOTES: UpdateNote[] = [
   {
+    id: 6,
+    date: '2026-10-26',
+    items: [
+      'メニューの「管理」に「使う機能」を追加しました。シフト・給与や口座残高など、使わない機能をオフにすると、メニューやダッシュボードに出なくなります。オフにしても記録は消えず、オンに戻すと元どおり表示されます。',
+    ],
+  },
+  {
     id: 5,
     date: '2026-10-23',
     items: [

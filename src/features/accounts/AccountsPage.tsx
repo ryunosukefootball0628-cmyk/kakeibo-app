@@ -8,6 +8,7 @@ import {
   useRecurrings,
   useSalaryTransactions,
 } from '../../hooks/useData';
+import { useFeatures } from '../../hooks/useFeatures';
 import { usePayrollsBetween } from '../../hooks/usePayroll';
 import type { Category, PaymentMethod, Transaction } from '../../types';
 import {
@@ -470,16 +471,27 @@ export default function AccountsPage() {
   const until = monthRange(outlookTo).end;
 
   // 定期支出を記録済みか確かめるため、前月の初めからの取引は必ず読む
-  const { methods, accounts, transactions, loading } = useAccountData(until, recentStart);
+  const { methods, accounts, transactions, loading } = useAccountData(until, {
+    from: recentStart,
+  });
   const methodById = useLookup(methods);
   const categories = useCategories();
   const categoryById = useLookup(categories);
-  const recurrings = useRecurrings();
-  const { payrolls } = usePayrollsBetween(outlookFrom, outlookTo);
+  // 使わない設定の機能 (給料・定期支出) は見込みに入れない
+  const features = useFeatures();
+  const usesShifts = features.isEnabled('shifts');
+  const usesRecurring = features.isEnabled('recurring');
+  const recurrings = useRecurrings(usesRecurring);
+  const { payrolls } = usePayrollsBetween(outlookFrom, outlookTo, usesShifts);
   const salaryTransactions = useSalaryTransactions(
     addMonths(thisMonth, -SALARY_HISTORY_MONTHS),
     outlookTo,
+    usesShifts,
   );
+  const forecastKinds = [
+    usesShifts && 'まだ記録していない給料の見込み',
+    usesRecurring && 'この口座から支払う定期支出',
+  ].filter(Boolean);
 
   const forecasts = useMemo(
     () => [
@@ -548,7 +560,8 @@ export default function AccountsPage() {
 
       {accounts.length > 0 && (
         <p className="muted">
-          残高は、入力した日の残高に、翌日からの収入・支出（この口座を支払い方法・入金先にした取引）と、カードの引き落とし（請求予定額）を足し引きして計算します。ATM での引き出しや口座間の移動は記録できないため、通帳やアプリの残高とずれたら「残高を合わせる」で直してください。予定には、まだ記録していない給料の見込みと、この口座から支払う定期支出も入れています。
+          残高は、入力した日の残高に、翌日からの収入・支出（この口座を支払い方法・入金先にした取引）と、カードの引き落とし（請求予定額）を足し引きして計算します。ATM での引き出しや口座間の移動は記録できないため、通帳やアプリの残高とずれたら「残高を合わせる」で直してください。
+          {forecastKinds.length > 0 && `予定には、${forecastKinds.join('と、')}も入れています。`}
         </p>
       )}
     </>

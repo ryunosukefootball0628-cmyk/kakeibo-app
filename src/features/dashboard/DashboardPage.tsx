@@ -20,6 +20,7 @@ import {
   useSalaryTransactions,
   useTransactionsBetween,
 } from '../../hooks/useData';
+import { useFeatures } from '../../hooks/useFeatures';
 import { usePayrolls } from '../../hooks/usePayroll';
 import {
   accountLedger,
@@ -45,15 +46,19 @@ import { pendingRecurrings } from '../../utils/recurring';
 
 export default function DashboardPage() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  // 使わない設定の機能は、データを読まず表示もしない
+  const features = useFeatures();
+  const usesAccounts = features.isEnabled('accounts');
+  const usesShifts = features.isEnabled('shifts');
   const categories = useCategories();
   const paymentMethods = usePaymentMethods();
-  const recurrings = useRecurrings();
+  const recurrings = useRecurrings(features.isEnabled('recurring'));
   const categoryById = useLookup(categories);
   const methodById = useLookup(paymentMethods);
 
   // 口座の残高は選んだ月によらず今日の時点
   const today = todayIso();
-  const accountData = useAccountData(today);
+  const accountData = useAccountData(today, { enabled: usesAccounts });
   const balances = useMemo(
     () =>
       accountData.accounts.filter(hasBalance).map((account) => ({
@@ -143,8 +148,8 @@ export default function DashboardPage() {
     [recurrings, monthTransactions, yearMonth],
   );
 
-  const { payrolls } = usePayrolls(yearMonth);
-  const salaryTransactions = useSalaryTransactions(yearMonth, yearMonth);
+  const { payrolls } = usePayrolls(yearMonth, usesShifts);
+  const salaryTransactions = useSalaryTransactions(yearMonth, yearMonth, usesShifts);
   const pendingSalaries = useMemo(
     () => pendingPayrolls(payrolls, salaryTransactions, today),
     [payrolls, salaryTransactions, today],
@@ -330,7 +335,7 @@ export default function DashboardPage() {
                   <th>カード</th>
                   <th>対象期間</th>
                   <th>支払日</th>
-                  <th>引き落とし口座</th>
+                  {usesAccounts && <th>引き落とし口座</th>}
                   <th style={{ textAlign: 'right' }}>請求予定額</th>
                 </tr>
               </thead>
@@ -342,9 +347,11 @@ export default function DashboardPage() {
                       {cycle.periodStart} 〜 {cycle.periodEnd}
                     </td>
                     <td>{cycle.paymentDate}</td>
-                    <td className="muted">
-                      {debitAccountOf(method, methodById)?.name ?? '未設定'}
-                    </td>
+                    {usesAccounts && (
+                      <td className="muted">
+                        {debitAccountOf(method, methodById)?.name ?? '未設定'}
+                      </td>
+                    )}
                     <td className="amount">{formatYen(amount)}</td>
                   </tr>
                 ))}

@@ -73,8 +73,20 @@ service cloud.firestore {
       return !(key in data) || isWage(data[key]);
     }
 
+    // 「使う機能」でオフにした機能 (src/optionalFeatures.ts の FeatureId)。
+    // 機能を足したら、ここにも足してから反映する
+    function isFeatureList(value) {
+      return value is list
+        && value.size() <= 20
+        && value.hasOnly(['accounts', 'shifts', 'calendar', 'categoryReport', 'paymentMethodReport', 'recurring']);
+    }
+
+    // createdAt が無いと、初回ログイン時の初期データの作成が飛ばされるので必須にする
     function isProfile(data) {
-      return data.keys().hasOnly(['createdAt']) && isText(data.createdAt, 40);
+      return data.keys().hasAll(['createdAt'])
+        && data.keys().hasOnly(['createdAt', 'disabledFeatures'])
+        && isText(data.createdAt, 40)
+        && (!('disabledFeatures' in data) || isFeatureList(data.disabledFeatures));
     }
 
     function isTransaction(data) {

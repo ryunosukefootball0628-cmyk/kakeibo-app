@@ -5,6 +5,8 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   deleteField,
@@ -314,10 +316,33 @@ describe('マスタ・定期支出・プロフィールの形式', () => {
     await assertFails(setDoc(ref, { ...monthly, monthOfYear: 13 }));
   });
 
-  test('プロフィールは createdAt だけ', async () => {
+  test('プロフィールは作成日時と、オフにした機能だけ', async () => {
     const ref = doc(alice(), 'users', 'alice');
-    await assertSucceeds(setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z' }));
-    await assertFails(setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z', admin: true }));
+    const createdAt = '2026-10-16T03:00:00.000Z';
+    // 作成日時の無いプロフィールがあると、初回ログイン時の初期データの作成が飛ばされる
+    await assertFails(setDoc(ref, { disabledFeatures: ['shifts'] }));
+    await assertSucceeds(setDoc(ref, { createdAt }));
+    await assertSucceeds(setDoc(ref, { createdAt, disabledFeatures: [] }));
+    await assertFails(setDoc(ref, { createdAt, admin: true }));
+  });
+
+  test('使う機能の切り替え', async () => {
+    const ref = doc(alice(), 'users', 'alice');
+    await setDoc(ref, { createdAt: '2026-10-16T03:00:00.000Z' });
+    // 画面からは、オフにした機能の一覧に足し引きする形で書く
+    await assertSucceeds(updateDoc(ref, { disabledFeatures: arrayUnion('shifts', 'accounts') }));
+    await assertSucceeds(updateDoc(ref, { disabledFeatures: arrayRemove('shifts') }));
+    await assertSucceeds(
+      updateDoc(ref, {
+        disabledFeatures: ['accounts', 'shifts', 'calendar', 'categoryReport', 'paymentMethodReport', 'recurring'],
+      }),
+    );
+    await assertFails(updateDoc(ref, { disabledFeatures: arrayUnion('budget') }));
+    await assertFails(updateDoc(ref, { disabledFeatures: 'shifts' }));
+    await assertFails(updateDoc(ref, { disabledFeatures: [1] }));
+    await assertFails(updateDoc(ref, { disabledFeatures: Array(21).fill('shifts') }));
+    await assertFails(updateDoc(ref, { createdAt: deleteField() }));
+    await assertFails(updateDoc(doc(bob(), 'users', 'alice'), { disabledFeatures: arrayUnion('shifts') }));
   });
 });
 

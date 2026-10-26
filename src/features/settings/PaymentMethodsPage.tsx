@@ -10,6 +10,7 @@ import {
 import { newId } from '../../db/seed';
 import { useLookup, usePaymentMethods } from '../../hooks/useData';
 import { useDragReorder } from '../../hooks/useDragReorder';
+import { useFeatures } from '../../hooks/useFeatures';
 import type { PaymentMethod, PaymentMethodKind } from '../../types';
 import { cardsDebitedFrom, debitAccountOf } from '../../utils/balance';
 import { closingRuleLabel } from '../../utils/billing';
@@ -37,6 +38,8 @@ export default function PaymentMethodsPage() {
   const sortable = useDragReorder(paymentMethods, reorderPaymentMethods);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState('');
+  // 引き落とし口座は口座残高の機能の一部。使わない設定なら欄を出さない (設定済みの値は残す)
+  const usesAccounts = useFeatures().isEnabled('accounts');
 
   const bankAccounts = paymentMethods.filter((m) => m.kind === 'bank');
 
@@ -49,7 +52,8 @@ export default function PaymentMethodsPage() {
       closingDay: '31',
       paymentDay: '27',
       paymentMonthOffset: '1',
-      debitAccountId: bankAccounts[0]?.id ?? '',
+      // 欄を出さないときは、利用者が見ていない口座を設定しない
+      debitAccountId: usesAccounts ? (bankAccounts[0]?.id ?? '') : '',
     });
   };
 
@@ -197,31 +201,33 @@ export default function PaymentMethodsPage() {
                     <option value="2">締め月の翌々月</option>
                   </select>
                 </label>
-                <label className="field">
-                  引き落とし口座
-                  <select
-                    value={form.debitAccountId}
-                    onChange={(e) => setForm({ ...form, debitAccountId: e.target.value })}
-                  >
-                    {bankAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                    <option value="">設定しない</option>
-                  </select>
-                </label>
+                {usesAccounts && (
+                  <label className="field">
+                    引き落とし口座
+                    <select
+                      value={form.debitAccountId}
+                      onChange={(e) => setForm({ ...form, debitAccountId: e.target.value })}
+                    >
+                      {bankAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                      <option value="">設定しない</option>
+                    </select>
+                  </label>
+                )}
               </>
             )}
           </div>
 
-          {form.kind === 'credit_card' && (
+          {form.kind === 'credit_card' && usesAccounts && (
             <p className="muted">
               引き落とし口座を選ぶと、支払日に請求予定額を「口座残高」の残高から引きます。
               {bankAccounts.length === 0 && '先に種別を「銀行口座」にした支払い方法を追加すると選べます。'}
             </p>
           )}
-          {form.kind === 'bank' && (
+          {form.kind === 'bank' && usesAccounts && (
             <p className="muted">
               残高は「<Link to="/accounts">口座残高</Link>」の画面で入力します。
             </p>
@@ -252,7 +258,7 @@ export default function PaymentMethodsPage() {
                   <th>名称</th>
                   <th>種別</th>
                   <th>締め日 / 支払日</th>
-                  <th>引き落とし口座</th>
+                  {usesAccounts && <th>引き落とし口座</th>}
                   <th></th>
                 </tr>
               </thead>
@@ -285,11 +291,13 @@ export default function PaymentMethodsPage() {
                           })
                         : '—'}
                     </td>
-                    <td className="muted">
-                      {method.kind === 'credit_card'
-                        ? (debitAccountOf(method, methodById)?.name ?? '未設定')
-                        : '—'}
-                    </td>
+                    {usesAccounts && (
+                      <td className="muted">
+                        {method.kind === 'credit_card'
+                          ? (debitAccountOf(method, methodById)?.name ?? '未設定')
+                          : '—'}
+                      </td>
+                    )}
                     <td>
                       <span className="row">
                         <button className="small" onClick={() => openEdit(method)}>

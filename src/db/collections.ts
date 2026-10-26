@@ -18,7 +18,7 @@ import type {
 
 /**
  * Firestore 上の配置:
- *   users/{uid}                       … プロフィール (初期データを作成済みかの目印)
+ *   users/{uid}                       … プロフィール (初期データを作成済みかの目印と、オフにした機能)
  *   users/{uid}/transactions/{id}     … 取引
  *   users/{uid}/categories/{id}       … カテゴリ
  *   users/{uid}/paymentMethods/{id}   … 支払い方法
