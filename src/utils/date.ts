@@ -83,6 +83,12 @@ export function datesOfMonth(ym: string): string[] {
   );
 }
 
+/** 期間の表記などに使う短い日付 (9/1) */
+export function shortDate(isoDate: string): string {
+  const [, m, d] = isoDate.split('-').map(Number);
+  return `${m}/${d}`;
+}
+
 export function dateLabel(isoDate: string): string {
   const [, m, d] = isoDate.split('-').map(Number);
   const weekday = ['日', '月', '火', '水', '木', '金', '土'][weekdayOf(isoDate)];

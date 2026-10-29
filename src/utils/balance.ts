@@ -1,9 +1,5 @@
 import type { PaymentMethod, RecurringExpense, Transaction } from '../types';
-import {
-  billingCycleForPaymentMonth,
-  sumTransactionsInPeriod,
-  type BillingCycle,
-} from './billing';
+import { billingCycleForPaymentMonth, cardBill, type BillingCycle } from './billing';
 import { addDays, toYearMonth, yearMonthsBetween } from './date';
 import { salaryDepositAccountId, salaryRecordsFor, type Payroll } from './payroll';
 import { pendingRecurrings } from './recurring';
@@ -38,7 +34,10 @@ export function cardsDebitedFrom(
 /** 口座の入出金の中身 */
 export type LedgerSource =
   | { type: 'transaction'; transaction: Transaction }
-  /** カードの請求の引き落とし。額は対象期間に記録した利用額の合計 (請求予定額と同じ概算) */
+  /**
+   * カードの請求の引き落とし。額は対象期間に記録した利用額の合計 (請求予定額と同じ概算)。
+   * 明細に合わせてほかの月の請求へ移した利用は、移した先の月で引く
+   */
   | { type: 'card'; card: PaymentMethod; cycle: BillingCycle }
   /** まだ記録していない給料の見込み */
   | { type: 'salary'; payroll: Payroll }
@@ -82,14 +81,10 @@ function cardWithdrawals(
   until: string,
 ): LedgerItem[] {
   return yearMonthsBetween(toYearMonth(after), toYearMonth(until)).flatMap((month) => {
-    const cycle = billingCycleForPaymentMonth(card, month);
-    if (!cycle || cycle.paymentDate <= after || cycle.paymentDate > until) return [];
-    const amount = sumTransactionsInPeriod(
-      transactions,
-      card.id,
-      cycle.periodStart,
-      cycle.periodEnd,
-    );
+    const bill = cardBill(card, transactions, month);
+    if (!bill) return [];
+    const { cycle, amount } = bill;
+    if (cycle.paymentDate <= after || cycle.paymentDate > until) return [];
     return amount > 0
       ? [{ date: cycle.paymentDate, amount: -amount, source: { type: 'card', card, cycle } }]
       : [];
@@ -99,7 +94,8 @@ function cardWithdrawals(
 /**
  * 口座の入出金 (記録した取引とカードの引き落とし) を古い順に並べ、それぞれのあとの残高を付ける。
  * 残高を合わせた日の入出金はその残高に含まれているので、翌日から until までを数える。
- * transactions には ledgerDataRange の期間の取引をすべて渡す
+ * transactions には ledgerDataRange の期間の取引をすべてと、その期間の月の請求へ移した
+ * カードの利用を渡す (useAccountData)
  */
 export function accountLedger(
   account: BalancedAccount,

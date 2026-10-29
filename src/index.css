@@ -838,6 +838,26 @@ tr.total-row td {
   margin-bottom: 0.5rem;
 }
 
+/* ---------- カードの請求の内訳 (src/features/reports/CardBillDetails.tsx) ---------- */
+
+/* 移すボタンは内容の下に並べ、スマホでも表が横にはみ出さないようにする */
+td.bill-item {
+  white-space: normal;
+}
+
+.bill-item-actions {
+  margin-top: 0.25rem;
+}
+
+/* ほかの月の請求へ移した利用。この請求の額には入らない */
+tr.moved-out td {
+  color: var(--muted);
+}
+
+tr.moved-out td.amount {
+  text-decoration: line-through;
+}
+
 /* ---------- 口座残高 ---------- */
 
 .balance-stats {

@@ -91,7 +91,7 @@ service cloud.firestore {
 
     function isTransaction(data) {
       return data.keys().hasAll(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'workplaceId', 'payMonth', 'grossPay', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['type', 'date', 'amount', 'categoryId', 'paymentMethodId', 'memo', 'recurringSourceId', 'workplaceId', 'payMonth', 'grossPay', 'billingMonth', 'createdAt', 'updatedAt'])
         && data.type in ['income', 'expense']
         && isDate(data.date)
         && isAmount(data.amount)
@@ -102,6 +102,7 @@ service cloud.firestore {
         && isOptionalText(data, 'workplaceId', 64)
         && (!('payMonth' in data) || isYearMonth(data.payMonth))
         && isOptionalAmount(data, 'grossPay')
+        && (!('billingMonth' in data) || isYearMonth(data.billingMonth))
         && isText(data.createdAt, 40)
         && isText(data.updatedAt, 40);
     }

@@ -1,5 +1,5 @@
 import type { PaymentMethod, Transaction } from '../types';
-import { addDays, addMonths, dateOfClampedDay } from './date';
+import { addDays, addMonths, dateOfClampedDay, toYearMonth } from './date';
 
 export interface BillingCycle {
   /** 支払いが発生する年月 (YYYY-MM) */
@@ -48,6 +48,17 @@ export function cycleForPaymentMonth(
   };
 }
 
+/**
+ * date を対象期間に含む支払月 (cycleForPaymentMonth の逆)。
+ * 締め日が 15 日・翌月払いなら、2026-10-15 は 2026-11、2026-10-16 は 2026-12 になる。
+ */
+export function paymentMonthOfDate(rule: ClosingRule, date: string): string {
+  const month = toYearMonth(date);
+  const closingYearMonth =
+    date <= dateOfClampedDay(month, rule.closingDay) ? month : addMonths(month, 1);
+  return addMonths(closingYearMonth, rule.paymentMonthOffset);
+}
+
 const OFFSET_LABEL = ['当月', '翌月', '翌々月'];
 
 const dayLabel = (day: number) => (day === 31 ? '月末' : `${day}日`);
@@ -58,37 +69,84 @@ export function closingRuleLabel(rule: ClosingRule): string {
   return `${dayLabel(rule.closingDay)}締め / ${offset}${dayLabel(rule.paymentDay)}払い`;
 }
 
+/** カードの締め日・支払日の決まり。カード以外や締め日が未設定なら null */
+export function cardClosingRule(method: PaymentMethod): ClosingRule | null {
+  if (method.kind !== 'credit_card') return null;
+  if (method.closingDay == null || method.paymentDay == null) return null;
+
+  return {
+    closingDay: method.closingDay,
+    paymentDay: method.paymentDay,
+    paymentMonthOffset: method.paymentMonthOffset ?? 1,
+  };
+}
+
 /** 指定した支払月に請求されるカードの利用期間。カード以外や締め日が未設定なら null */
 export function billingCycleForPaymentMonth(
   method: PaymentMethod,
   paymentYearMonth: string,
 ): BillingCycle | null {
-  if (method.kind !== 'credit_card') return null;
-  if (method.closingDay == null || method.paymentDay == null) return null;
-
-  return cycleForPaymentMonth(
-    {
-      closingDay: method.closingDay,
-      paymentDay: method.paymentDay,
-      paymentMonthOffset: method.paymentMonthOffset ?? 1,
-    },
-    paymentYearMonth,
-  );
+  const rule = cardClosingRule(method);
+  return rule && cycleForPaymentMonth(rule, paymentYearMonth);
 }
 
-export function sumTransactionsInPeriod(
+/**
+ * カードの利用を請求に入れる支払月。明細に合わせて移した月 (billingMonth) があればその月、
+ * 無ければ利用日と締め日から決まる月
+ */
+export function billingMonthOf(transaction: Transaction, rule: ClosingRule): string {
+  return transaction.billingMonth ?? paymentMonthOfDate(rule, transaction.date);
+}
+
+/** ある支払月のカードの請求 */
+export interface CardBill {
+  cycle: BillingCycle;
+  /** 請求に入るカードの支出。ほかの月の請求から移してきた利用も含む */
+  items: Transaction[];
+  /** 締め日からはこの請求に入るが、明細に合わせてほかの月の請求へ移した利用 */
+  movedOut: Transaction[];
+  /** 請求予定額 (items の合計) */
+  amount: number;
+}
+
+/**
+ * 指定した支払月のカードの請求。transactions には対象期間の取引と、その月の請求へ移した
+ * カードの利用 (useMovedCardTransactions) を渡す。カード以外や締め日が未設定なら null
+ */
+export function cardBill(
+  card: PaymentMethod,
   transactions: Transaction[],
-  methodId: string,
-  periodStart: string,
-  periodEnd: string,
-): number {
-  return transactions
-    .filter(
+  paymentYearMonth: string,
+): CardBill | null {
+  const rule = cardClosingRule(card);
+  if (!rule) return null;
+
+  const expenses = transactions.filter(
+    (t) => t.paymentMethodId === card.id && t.type === 'expense',
+  );
+  const items = expenses.filter((t) => billingMonthOf(t, rule) === paymentYearMonth);
+  return {
+    cycle: cycleForPaymentMonth(rule, paymentYearMonth),
+    items,
+    movedOut: expenses.filter(
       (t) =>
-        t.paymentMethodId === methodId &&
-        t.type === 'expense' &&
-        t.date >= periodStart &&
-        t.date <= periodEnd,
-    )
-    .reduce((sum, t) => sum + t.amount, 0);
+        t.billingMonth != null &&
+        t.billingMonth !== paymentYearMonth &&
+        paymentMonthOfDate(rule, t.date) === paymentYearMonth,
+    ),
+    amount: items.reduce((sum, t) => sum + t.amount, 0),
+  };
+}
+
+/**
+ * 日付の範囲で読んだ取引に、ほかの月の請求へ移したカードの利用 (useMovedCardTransactions) を足す。
+ * 両方に入っている取引は 1 件にする
+ */
+export function withMovedCardTransactions(
+  transactions: Transaction[],
+  moved: Transaction[],
+): Transaction[] {
+  if (moved.length === 0) return transactions;
+  const ids = new Set(transactions.map((t) => t.id));
+  return [...transactions, ...moved.filter((t) => !ids.has(t.id))];
 }

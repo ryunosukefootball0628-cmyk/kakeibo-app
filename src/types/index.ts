@@ -22,6 +22,11 @@ export interface Transaction {
   payMonth?: string;
   /** 給与明細の総支給額 (amount は口座に入った手取り額) */
   grossPay?: number;
+  /**
+   * カードの請求に入れる支払月 (YYYY-MM)。締め日の近くの利用などが、明細で締め日から決まる月と
+   * 違う月の請求になっていたときだけ持つ
+   */
+  billingMonth?: string;
   createdAt: string;
   updatedAt: string;
 }

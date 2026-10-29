@@ -29,18 +29,13 @@ import {
   dateLabel,
   monthRange,
   parseYearMonth,
+  shortDate,
   todayIso,
   toYearMonth,
   yearMonthsBetween,
 } from '../../utils/date';
 import { formatBalance, formatSignedYen, formatYen, MAX_AMOUNT } from '../../utils/money';
 import { SALARY_HISTORY_MONTHS } from '../../utils/payroll';
-
-/** 期間の表記に使う短い日付 (9/1) */
-function shortDate(isoDate: string): string {
-  const [, m, d] = isoDate.split('-').map(Number);
-  return `${m}/${d}`;
-}
 
 function entryKey({ date, source }: LedgerEntry): string {
   switch (source.type) {

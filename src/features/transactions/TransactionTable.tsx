@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { deleteTransaction } from '../../db/operations';
 import type { Category, PaymentMethod, Transaction } from '../../types';
-import { dateLabel } from '../../utils/date';
+import { dateLabel, parseYearMonth } from '../../utils/date';
 import { formatYen } from '../../utils/money';
 import type { TransactionFormState } from './TransactionFormPage';
 
@@ -45,6 +45,7 @@ export default function TransactionTable({
         <tbody>
           {transactions.map((t) => {
             const category = categoryById.get(t.categoryId);
+            const method = methodById.get(t.paymentMethodId);
             return (
               <tr key={t.id}>
                 {showDate && <td>{dateLabel(t.date)}</td>}
@@ -55,7 +56,19 @@ export default function TransactionTable({
                   />
                   {category?.name ?? '(削除済み)'}
                 </td>
-                <td>{methodById.get(t.paymentMethodId)?.name ?? '(削除済み)'}</td>
+                <td>
+                  {method?.name ?? '(削除済み)'}
+                  {/* 明細に合わせて、締め日どおりと違う月の請求に移したカードの利用 */}
+                  {t.billingMonth && method?.kind === 'credit_card' && (
+                    <span
+                      className="tag"
+                      style={{ marginLeft: '0.4rem' }}
+                      title="カードの明細に合わせて支払月を変えた利用"
+                    >
+                      {parseYearMonth(t.billingMonth).month}月払い
+                    </span>
+                  )}
+                </td>
                 <td className="memo">{t.memo}</td>
                 <td className={`amount ${t.type === 'income' ? 'income' : 'expense'}`}>
                   {t.type === 'income' ? '+' : '-'}

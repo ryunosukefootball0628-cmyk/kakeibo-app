@@ -69,6 +69,7 @@ const FIELDS: { [K in CollectionName]: Exclude<keyof CollectionTypes[K], 'id'>[]
     'workplaceId',
     'payMonth',
     'grossPay',
+    'billingMonth',
     'createdAt',
     'updatedAt',
   ],

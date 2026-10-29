@@ -158,6 +158,31 @@ describe('取引の形式', () => {
     await assertFails(setDoc(txRef(alice()), { ...salary, grossPay: 100.5 }));
     await assertFails(setDoc(txRef(alice()), { ...salary, workplaceId: 'x'.repeat(65) }));
   });
+
+  test('明細に合わせてほかの月の請求へ移したカードの利用 (支払月付き)', async () => {
+    const card = { ...transaction, paymentMethodId: 'card', billingMonth: '2026-12' };
+    await assertSucceeds(setDoc(txRef(alice()), card));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(alice(), 'users', 'alice', 'transactions'),
+          where('billingMonth', '>=', '2026-11'),
+          where('billingMonth', '<=', '2027-01'),
+        ),
+      ),
+    );
+    // 内訳の「〇月払いへ移す」は支払月だけを書き換え、「戻す」は消す
+    await assertSucceeds(
+      updateDoc(txRef(alice()), { billingMonth: '2027-01', updatedAt: '2026-10-17T00:00:00.000Z' }),
+    );
+    await assertSucceeds(
+      updateDoc(txRef(alice()), { billingMonth: deleteField(), updatedAt: '2026-10-17T00:00:00.000Z' }),
+    );
+    await assertFails(setDoc(txRef(alice()), { ...card, billingMonth: '2026-12-27' }));
+    await assertFails(setDoc(txRef(alice()), { ...card, billingMonth: '2026-13' }));
+    await assertFails(setDoc(txRef(alice()), { ...card, billingMonth: 202612 }));
+    await assertFails(setDoc(txRef(alice()), { ...card, billingMonth: '' }));
+  });
 });
 
 describe('シフト・給与の形式', () => {

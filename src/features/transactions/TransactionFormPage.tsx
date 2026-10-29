@@ -7,8 +7,12 @@ import {
   useTransaction,
 } from '../../hooks/useData';
 import type { TransactionType } from '../../types';
-import { todayIso } from '../../utils/date';
+import { cardClosingRule, paymentMonthOfDate } from '../../utils/billing';
+import { addMonths, todayIso, yearMonthLabel } from '../../utils/date';
 import { formatYen, MAX_AMOUNT } from '../../utils/money';
+
+/** カードの支払月として選べる月 (締め日どおりの月からの差) */
+const BILLING_MONTH_CHOICES = [-1, 0, 1, 2];
 
 /** 他の画面から登録・編集を開くときに navigate の state で渡せる値 */
 export interface TransactionFormState {
@@ -33,6 +37,8 @@ export default function TransactionFormPage() {
   const [categoryId, setCategoryId] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [memo, setMemo] = useState('');
+  /** 明細に合わせて選んだカードの支払月。undefined なら締め日どおり */
+  const [billingMonth, setBillingMonth] = useState<string>();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -43,6 +49,7 @@ export default function TransactionFormPage() {
     setCategoryId(existing.categoryId);
     setPaymentMethodId(existing.paymentMethodId);
     setMemo(existing.memo ?? '');
+    setBillingMonth(existing.billingMonth);
   }, [existing]);
 
   const selectableCategories = useMemo(
@@ -63,6 +70,22 @@ export default function TransactionFormPage() {
       setPaymentMethodId(paymentMethods[0].id);
     }
   }, [paymentMethods, paymentMethodId]);
+
+  // カードの支出なら、明細に合わせて請求に入れる支払月を選べる。はじめは利用日と締め日から決まる月
+  const selectedMethod = paymentMethods.find((m) => m.id === paymentMethodId);
+  const closingRule =
+    type === 'expense' && selectedMethod && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? cardClosingRule(selectedMethod)
+      : null;
+  const regularBillingMonth = closingRule && paymentMonthOfDate(closingRule, date);
+  const billingMonthChoices = regularBillingMonth
+    ? BILLING_MONTH_CHOICES.map((delta) => addMonths(regularBillingMonth, delta))
+    : [];
+  // 利用日を大きく直すなどして選べる月から外れたら、締め日どおりに戻す
+  const selectedBillingMonth =
+    billingMonth && billingMonthChoices.includes(billingMonth)
+      ? billingMonth
+      : regularBillingMonth;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -93,6 +116,11 @@ export default function TransactionFormPage() {
       paymentMethodId,
       memo: memo.trim() || undefined,
       recurringSourceId: existing?.recurringSourceId,
+      // 締め日どおりの月なら持たない
+      billingMonth:
+        selectedBillingMonth && selectedBillingMonth !== regularBillingMonth
+          ? selectedBillingMonth
+          : undefined,
     };
 
     if (id) {
@@ -172,7 +200,11 @@ export default function TransactionFormPage() {
             {type === 'income' ? '入金先' : '支払い方法'}
             <select
               value={paymentMethodId}
-              onChange={(e) => setPaymentMethodId(e.target.value)}
+              onChange={(e) => {
+                setPaymentMethodId(e.target.value);
+                // 支払月はカードごとの請求の月なので、支払い方法を変えたら締め日どおりに戻す
+                setBillingMonth(undefined);
+              }}
             >
               {paymentMethods.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -181,6 +213,22 @@ export default function TransactionFormPage() {
               ))}
             </select>
           </label>
+
+          {billingMonthChoices.length > 0 && (
+            <label className="field">
+              カードの支払月
+              <select
+                value={selectedBillingMonth ?? ''}
+                onChange={(e) => setBillingMonth(e.target.value)}
+              >
+                {billingMonthChoices.map((month) => (
+                  <option key={month} value={month}>
+                    {`${yearMonthLabel(month)}払い${month === regularBillingMonth ? '（締め日どおり）' : ''}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="field">
             メモ

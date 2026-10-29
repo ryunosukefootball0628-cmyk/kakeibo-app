@@ -91,6 +91,19 @@ export function deleteTransaction(id: string): void {
   inBackground(deleteDoc(itemRef('transactions', id)));
 }
 
+/**
+ * カードの利用を請求に入れる支払月を、明細に合わせて変える。
+ * undefined なら移した月を消し、締め日から決まる月に戻す
+ */
+export function setBillingMonth(id: string, billingMonth: string | undefined): void {
+  inBackground(
+    updateDoc(itemRef('transactions', id), {
+      billingMonth: billingMonth ?? deleteField(),
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
 /** 定期支出の発生予定を実績の取引として記録する */
 export function recordRecurring(recurring: RecurringExpense, date: string): void {
   addTransaction({

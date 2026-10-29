@@ -121,6 +121,29 @@ export function useTransactionsResult(range: { start: string; end: string } | nu
   );
 }
 
+/**
+ * 明細に合わせてほかの月の請求へ移したカードの利用のうち、移した先の支払月が from〜to のもの。
+ * 利用日が請求の対象期間の外にあり、日付の範囲で読んだ取引に入らないことがあるため、支払月で読む。
+ * billingMonth を持たない普通の取引はこの条件に当てはまらないので含まれない。months が null なら読まない
+ */
+export function useMovedCardTransactionsResult(months: { from: string; to: string } | null) {
+  return useLiveResult<Transaction>(
+    months &&
+      ((uid) =>
+        query(
+          userCollection('transactions', uid),
+          where('billingMonth', '>=', months.from),
+          where('billingMonth', '<=', months.to),
+        )),
+    [months?.from, months?.to],
+  );
+}
+
+/** enabled が false (締め日を設定したカードが無いなど) なら読まない */
+export function useMovedCardTransactions(fromMonth: string, toMonth: string, enabled = true) {
+  return useMovedCardTransactionsResult(enabled ? { from: fromMonth, to: toMonth } : null).items;
+}
+
 export function useTransactionsInMonth(yearMonth: string) {
   const { start, end } = monthRange(yearMonth);
   return useTransactionsBetween(start, end);

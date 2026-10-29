@@ -15,6 +15,7 @@ import { useAccountData } from '../../hooks/useAccounts';
 import {
   useCategories,
   useLookup,
+  useMovedCardTransactions,
   usePaymentMethods,
   useRecurrings,
   useSalaryTransactions,
@@ -28,10 +29,7 @@ import {
   debitAccountOf,
   hasBalance,
 } from '../../utils/balance';
-import {
-  billingCycleForPaymentMonth,
-  sumTransactionsInPeriod,
-} from '../../utils/billing';
+import { cardBill, cardClosingRule, withMovedCardTransactions } from '../../utils/billing';
 import {
   addMonths,
   currentYearMonth,
@@ -43,6 +41,7 @@ import {
 import { formatBalance, formatSignedYen, formatYen } from '../../utils/money';
 import { pendingPayrolls } from '../../utils/payroll';
 import { pendingRecurrings } from '../../utils/recurring';
+import CardBillDetails from '../reports/CardBillDetails';
 
 export default function DashboardPage() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
@@ -122,26 +121,19 @@ export default function DashboardPage() {
     [paymentMethods, monthTransactions],
   );
 
-  const cardBillings = useMemo(
-    () =>
-      paymentMethods.flatMap((method) => {
-        const cycle = billingCycleForPaymentMonth(method, yearMonth);
-        if (!cycle) return [];
-        return [
-          {
-            method,
-            cycle,
-            amount: sumTransactionsInPeriod(
-              wideTransactions,
-              method.id,
-              cycle.periodStart,
-              cycle.periodEnd,
-            ),
-          },
-        ];
-      }),
-    [paymentMethods, yearMonth, wideTransactions],
+  // ほかの月の請求からこの月へ移したカードの利用は、利用日が上の期間の外のことがあるので支払月で読む
+  const movedCardTransactions = useMovedCardTransactions(
+    yearMonth,
+    yearMonth,
+    paymentMethods.some((m) => cardClosingRule(m) != null),
   );
+  const cardBills = useMemo(() => {
+    const billed = withMovedCardTransactions(wideTransactions, movedCardTransactions);
+    return paymentMethods.flatMap((method) => {
+      const bill = cardBill(method, billed, yearMonth);
+      return bill ? [{ method, bill }] : [];
+    });
+  }, [paymentMethods, yearMonth, wideTransactions, movedCardTransactions]);
 
   const pending = useMemo(
     () => pendingRecurrings(recurrings, monthTransactions, yearMonth),
@@ -325,7 +317,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {cardBillings.length > 0 && (
+      {cardBills.length > 0 && (
         <div className="card">
           <h2>{yearMonthLabel(yearMonth)}に支払うカード請求額</h2>
           <div className="table-wrap">
@@ -340,7 +332,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {cardBillings.map(({ method, cycle, amount }) => (
+                {cardBills.map(({ method, bill: { cycle, amount } }) => (
                   <tr key={method.id}>
                     <td>{method.name}</td>
                     <td className="muted">
@@ -358,8 +350,18 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          {cardBills.map(({ method, bill }) => (
+            <CardBillDetails
+              key={method.id}
+              card={method}
+              bill={bill}
+              categoryById={categoryById}
+              label={`${method.name}の内訳`}
+              returnTo="/"
+            />
+          ))}
           <p className="muted">
-            締め日・支払日の設定にもとづく概算です。実際の請求額とは異なる場合があります。
+            締め日・支払日の設定にもとづく概算です。実際の請求額とは異なる場合があります。締め日の近くの利用などが明細と違う月の請求になっていたら、内訳から支払月を移せます。
           </p>
         </div>
       )}
